@@ -1,0 +1,16 @@
+{
+  "name": "sistema-dece-uets",
+  "private": true,
+  "description": "Sistema DECE (UETS) — portal con micro frontends y microservicios. Cada app/servicio es independiente (su propio package.json); este archivo solo orquesta el desarrollo local.",
+  "scripts": {
+    "install:all": "npm install && npm --prefix services/identity-service install && npm --prefix services/tutoring-service install && npm --prefix services/api-gateway install && npm --prefix services/notification-service install && npm --prefix apps/portal-shell install && npm --prefix apps/tutorias-mfe install",
+    "db:setup": "npm --prefix services/identity-service run prisma:deploy && npm --prefix services/identity-service run import:tutoring-users && npm --prefix services/tutoring-service run prisma:deploy && npm --prefix services/notification-service run prisma:deploy",
+    "db:migrate": "npm --prefix services/identity-service run prisma:deploy && npm --prefix services/tutoring-service run prisma:deploy && npm --prefix services/notification-service run prisma:deploy",
+    "db:seed": "npm --prefix services/identity-service run seed && npm --prefix services/tutoring-service run seed",
+    "dev": "concurrently -k -n identity,tutoring,notif,gateway,portal,tutorias -c blue,green,red,yellow,magenta,cyan \"npm --prefix services/identity-service run start:dev\" \"npm --prefix services/tutoring-service run start:dev\" \"npm --prefix services/notification-service run start:dev\" \"npm --prefix services/api-gateway run start:dev\" \"npm --prefix apps/portal-shell run dev\" \"npm --prefix apps/tutorias-mfe run dev\"",
+    "test": "npm --prefix services/identity-service test && npm --prefix services/tutoring-service test && npm --prefix services/notification-service test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

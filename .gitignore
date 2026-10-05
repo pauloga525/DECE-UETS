@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+!.env.prod.example
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+
+# Claves JWT generadas en desarrollo por identity-service
+.keys/
+
+# Respaldos locales de la base de datos
+backups/
+
+# Correos simulados en desarrollo (MAIL_MODE=log)
+mail-outbox/
+
+# Certificados generados con deploy/certs/generar-certificados.sh (la clave de la CA es secreta)
+deploy/certs/out/
+*.key
+
+# Configuración local de Claude Code
+.claude/

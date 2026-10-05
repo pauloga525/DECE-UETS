@@ -1,0 +1,51 @@
+// Base propia del notification-service: schema "notifications" (database-per-service).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Notificación dentro del sistema (campana del portal). userId = id del identity-service.
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String // TUTORING_ABSENCES, TUTORING_COMPLETED, TUTORING_NOT_HELD
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+// Evento ya procesado: garantiza que un reintento del outbox no duplique correos.
+model ProcessedEvent {
+  id          String   @id // id del evento en el outbox de origen
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("processed_events")
+}
+
+// Bitácora de cada correo: a quién, qué asunto, si salió, se simuló (modo log) o falló.
+model EmailLog {
+  id        String   @id @default(uuid())
+  eventId   String
+  eventType String
+  audience  String // teacher | guardian | dece
+  to        String
+  subject   String
+  status    String // SENT | LOGGED | REDIRECTED | FAILED
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([createdAt])
+  @@map("email_logs")
+}

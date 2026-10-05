@@ -1,0 +1,524 @@
+// Modelo de dominio — Sistema de Gestión de Tutorías Académicas
+// Ver docs/casos-de-uso.md y docs/decisiones.md para el contexto de negocio detrás de cada tabla.
+//
+// Decisiones de alcance fijadas para el MVP (sección 14 del plan):
+//   - Paralelos: OBLIGATORIOS (toda TutoringSession y TutoringEnrollment referencian un Parallel concreto).
+//   - Tutorías multinivel: DESCARTADAS. Relación TutoringSession -> Level es 1:1.
+//   - Alcance institucional: una sola institución. No hay tabla/tenant Institution.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Identidad y acceso
+// ─────────────────────────────────────────────────────────────────────────
+
+// Espeja los roles del identity-service (+ STUDENT, heredado del modelo original; los
+// estudiantes no inician sesión).
+enum UserRole {
+  ADMIN
+  PSYCHOLOGY_COORDINATOR
+  PSYCHOLOGIST
+  TEACHER
+  ANIMATOR // animador de curso (nivel + paralelo)
+  STUDENT
+}
+
+model User {
+  // Proyección local del usuario del identity-service (dueño de la identidad y del login
+  // con Google). El id es el mismo ("sub" del JWT); se crea/actualiza sola en cada request
+  // autenticado (ver IdentityClient). Aquí no hay contraseñas ni versión de token.
+  id        String   @id
+  email     String   @unique
+  role      UserRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher Teacher?
+  student Student?
+
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  cancelledSessions  TutoringSession[]    @relation("SessionCancelledBy")
+  submittedReports   TutoringReport[]     @relation("ReportSubmittedBy")
+  createdEnrollments TutoringEnrollment[] @relation("EnrollmentCreatedBy")
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Estructura académica
+// ─────────────────────────────────────────────────────────────────────────
+
+model AcademicPeriod {
+  id        String   @id @default(uuid())
+  name      String // ej. "2026-2027"
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  levels             Level[]
+  teacherAssignments TeacherAssignment[]
+  tutoringSessions   TutoringSession[]
+
+  @@map("academic_periods")
+}
+
+model Level {
+  id               String   @id @default(uuid())
+  name             String // ej. "9.º EGB", "2.º Bachillerato"
+  // Subdivisión del curso tal como viene de secretaría (carga de alumnos 2026-10-02):
+  // educationLevel = "EDUCACIÓN GENERAL BÁSICA" | "BACHILLERATO"
+  // stage          = "Básica Media", "Preparatoria"… o la especialidad del bachillerato
+  // grade          = número de curso (1–10 en EGB, 1–3 en bachillerato)
+  educationLevel   String?
+  stage            String?
+  grade            Int?
+  order            Int // orden de despliegue en listados/árboles
+  academicPeriodId String
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  academicPeriod AcademicPeriod @relation(fields: [academicPeriodId], references: [id], onDelete: Restrict)
+  parallels      Parallel[]
+  students       Student[]
+
+  teacherAssignments TeacherAssignment[]
+  tutoringSessions   TutoringSession[]
+
+  @@unique([academicPeriodId, name])
+  @@map("levels")
+}
+
+model Parallel {
+  id            String   @id @default(uuid())
+  name          String // ej. "A", "B"
+  levelId       String
+  // Animador del curso (pedido 2026-09-30). Por correo institucional para poder asignarlo
+  // antes de su primer login; ve los alumnos y reportes de tutorías SOLO de este curso.
+  animatorEmail String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  level Level @relation(fields: [levelId], references: [id], onDelete: Restrict)
+
+  students           Student[]
+  tutoringSessions   TutoringSession[]
+  assignmentParallels TeacherAssignmentParallel[]
+
+  @@unique([levelId, name])
+  @@index([animatorEmail])
+  @@map("parallels")
+}
+
+model Subject {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacherAssignments TeacherAssignment[]
+  tutoringSessions   TutoringSession[]
+
+  @@map("subjects")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Personas
+// ─────────────────────────────────────────────────────────────────────────
+
+model Teacher {
+  id        String   @id @default(uuid())
+  userId    String?  @unique
+  firstName String
+  lastName  String
+  email     String   @unique
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  assignments      TeacherAssignment[]
+  tutoringSessions TutoringSession[]
+
+  @@map("teachers")
+}
+
+model Student {
+  id             String   @id @default(uuid())
+  userId         String?  @unique
+  firstName      String
+  lastName       String
+  identification String   @unique // cédula / código institucional
+  levelId        String
+  parallelId     String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  level    Level    @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  parallel Parallel @relation(fields: [parallelId], references: [id], onDelete: Restrict)
+
+  enrollments     TutoringEnrollment[]
+  waitlistEntries Waitlist[]
+  guardians       StudentGuardian[]
+
+  @@index([levelId, parallelId])
+  @@map("students")
+}
+
+// Representante legal / padre de familia. Recibe los correos de las tutorías de sus
+// representados (creación con invitación de calendario, inicio, cierre, faltas).
+model Guardian {
+  id             String   @id @default(uuid())
+  firstName      String
+  lastName       String
+  identification String?  @unique // cédula
+  email          String?
+  phone          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  students StudentGuardian[]
+
+  @@index([email])
+  @@map("guardians")
+}
+
+// Un estudiante puede tener varios representantes y un representante varios estudiantes.
+model StudentGuardian {
+  studentId     String
+  guardianId    String
+  relationship  String? // ej. "Madre", "Padre", "Abuela"
+  notifications Boolean @default(true) // si recibe los correos de tutorías
+
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, guardianId])
+  @@map("student_guardians")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Habilitación docente (regla central: disponibilidad ≠ tutoría)
+// ─────────────────────────────────────────────────────────────────────────
+
+model TeacherAssignment {
+  id               String   @id @default(uuid())
+  teacherId        String
+  subjectId        String
+  levelId          String
+  academicPeriodId String
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  teacher        Teacher        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  subject        Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  level          Level          @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  academicPeriod AcademicPeriod @relation(fields: [academicPeriodId], references: [id], onDelete: Restrict)
+
+  availabilityRules TeacherAvailabilityRule[]
+  tutoringSessions  TutoringSession[]
+  parallels         TeacherAssignmentParallel[]
+
+  // Regla 5, sección 4: el DECE solo puede ofrecer combinaciones con una asignación vigente.
+  @@unique([teacherId, subjectId, levelId, academicPeriodId])
+  @@map("teacher_assignments")
+}
+
+// Paralelos donde el docente dicta esa materia (carga de docentes 2026-10-05). Ej.: Educación
+// Física de 10.º EGB solo en A, B y C. Las tutorías de esa asignación admiten únicamente
+// alumnos de estos paralelos; sin filas, la asignación cubre todo el nivel (compatibilidad).
+model TeacherAssignmentParallel {
+  teacherAssignmentId String
+  parallelId          String
+
+  teacherAssignment TeacherAssignment @relation(fields: [teacherAssignmentId], references: [id], onDelete: Cascade)
+  parallel          Parallel          @relation(fields: [parallelId], references: [id], onDelete: Restrict)
+
+  @@id([teacherAssignmentId, parallelId])
+  @@index([parallelId])
+  @@map("teacher_assignment_parallels")
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// Patrón recurrente declarado por el docente (sección 7: "disponibilidad recurrente, no registro semanal").
+// El worker AvailabilityGenerator (Fase 2) proyecta estas reglas en TutoringSession(status=AVAILABLE).
+//
+// Cambio de lógica (pedido explícito de Paulo, posterior al plan original): el horario no es
+// genérico por docente — cuelga de una TeacherAssignment concreta (materia+nivel). Un docente de
+// Matemáticas y Lengua declara un horario distinto por cada combinación que enseña; el DECE ya no
+// elige materia/nivel al crear la tutoría porque el bloque generado los trae puestos de antemano.
+model TeacherAvailabilityRule {
+  id                  String    @id @default(uuid())
+  teacherAssignmentId String
+  dayOfWeek           DayOfWeek
+  startTime           String // "HH:mm", debe ser múltiplo de 40 min respecto a startTime del día
+  endTime             String // "HH:mm"
+  // Lugar donde el docente da estas tutorías (pedido 2026-10-02): lo declara al subir su
+  // horario y se copia a cada bloque generado, así no hay que escribirlo al agendar.
+  location            String?
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  teacherAssignment TeacherAssignment @relation(fields: [teacherAssignmentId], references: [id], onDelete: Restrict)
+
+  generatedSessions TutoringSession[]
+
+  @@index([teacherAssignmentId, dayOfWeek])
+  @@map("teacher_availability_rules")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tutorías (el bloque de 40 minutos es la unidad atómica de todo el sistema)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum SessionStatus {
+  AVAILABLE
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model TutoringSession {
+  id                  String        @id @default(uuid())
+  teacherId           String
+  // Materia y nivel ya no dependen de que el DECE los elija al agendar: vienen fijos desde que
+  // el bloque se genera, heredados de la TeacherAssignment detrás de la regla de disponibilidad.
+  subjectId           String
+  levelId             String
+  teacherAssignmentId String
+  parallelId          String? // se define recién al agendar (SCHEDULED) — no forma parte de la asignación.
+  academicPeriodId    String
+  availabilityRuleId  String?
+  date                DateTime      @db.Date
+  startTime           String // "HH:mm" — bloque fijo de 40 minutos (regla 1, sección 4)
+  endTime             String // "HH:mm"
+  capacity            Int           @default(10) // regla 2 — cupo 10 desde 2026-10-05 (antes 5)
+  status              SessionStatus @default(AVAILABLE)
+  // Espacio físico donde se realiza (aula, sala DECE, biblioteca...). Obligatorio al agendar,
+  // tanto si agenda el DECE como el propio docente (pedido 7/9/2026).
+  location            String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  // true si la cerró el sistema al vencer su bloque de 40 min (regla R7), no el docente.
+  autoCompleted       Boolean       @default(false)
+  cancelReason        String?
+  cancelledById       String?
+  cancelledAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  teacher           Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  subject           Subject                  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  level             Level                    @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  teacherAssignment TeacherAssignment        @relation(fields: [teacherAssignmentId], references: [id], onDelete: Restrict)
+  parallel          Parallel?                @relation(fields: [parallelId], references: [id], onDelete: Restrict)
+  academicPeriod    AcademicPeriod           @relation(fields: [academicPeriodId], references: [id], onDelete: Restrict)
+  availabilityRule  TeacherAvailabilityRule? @relation(fields: [availabilityRuleId], references: [id], onDelete: SetNull)
+  cancelledBy       User?                    @relation("SessionCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  enrollments TutoringEnrollment[]
+  waitlist    Waitlist[]
+  report      TutoringReport?
+
+  // Regla 6, sección 4: sin solape de docente. Consultado junto a date+startTime en el servicio de agenda
+  // bajo SELECT ... FOR UPDATE (sección 7) — la unicidad exacta se valida en transacción, no solo aquí.
+  @@unique([teacherId, date, startTime])
+  @@index([date, status])
+  @@map("tutoring_sessions")
+}
+
+enum EnrollmentReason {
+  ACADEMIC_REINFORCEMENT
+  LOW_PERFORMANCE
+  LEVELING
+  RECOVERY
+  TEACHER_REQUEST
+  STUDENT_REQUEST
+  REPRESENTATIVE_REQUEST
+  OTHER
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  ATTENDED
+  ABSENT
+  JUSTIFIED
+  CANCELLED
+}
+
+model TutoringEnrollment {
+  id                String           @id @default(uuid())
+  tutoringSessionId String
+  studentId         String
+  reason            EnrollmentReason
+  reasonNote        String?
+  status            EnrollmentStatus @default(ENROLLED)
+  createdById       String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  tutoringSession TutoringSession @relation(fields: [tutoringSessionId], references: [id], onDelete: Restrict)
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  createdBy       User            @relation("EnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  attendance Attendance?
+
+  // Regla 7, sección 4: sin solape de estudiante — se valida junto al horario de la sesión en transacción.
+  @@unique([tutoringSessionId, studentId])
+  @@map("tutoring_enrollments")
+}
+
+// Informe de cierre que completa el docente al finalizar (pedido 7/9/2026): destrezas
+// trabajadas, observaciones y tareas asignadas. Si el sistema cerró la tutoría sola a los
+// 40 min, la sesión queda COMPLETED sin informe ("informe pendiente") hasta que el docente lo
+// registre.
+model TutoringReport {
+  id                String   @id @default(uuid())
+  tutoringSessionId String   @unique
+  skills            String // destrezas trabajadas
+  observations      String
+  tasks             String? // tareas asignadas a los estudiantes
+  submittedById     String
+  submittedAt       DateTime @default(now())
+
+  tutoringSession TutoringSession @relation(fields: [tutoringSessionId], references: [id], onDelete: Restrict)
+  submittedBy     User            @relation("ReportSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  @@map("tutoring_reports")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  JUSTIFIED
+}
+
+model Attendance {
+  id           String           @id @default(uuid())
+  enrollmentId String           @unique
+  status       AttendanceStatus
+  note         String?
+  recordedAt   DateTime         @default(now())
+
+  enrollment TutoringEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@map("attendance")
+}
+
+enum WaitlistStatus {
+  WAITING
+  PROMOTED
+  CANCELLED
+}
+
+model Waitlist {
+  id                String           @id @default(uuid())
+  tutoringSessionId String
+  studentId         String
+  reason            EnrollmentReason
+  reasonNote        String?
+  position          Int
+  status            WaitlistStatus   @default(WAITING)
+  requestedAt       DateTime         @default(now())
+  promotedAt        DateTime?
+
+  tutoringSession TutoringSession @relation(fields: [tutoringSessionId], references: [id], onDelete: Cascade)
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([tutoringSessionId, studentId])
+  @@index([tutoringSessionId, position])
+  @@map("waitlist")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Soporte transversal
+// ─────────────────────────────────────────────────────────────────────────
+
+// Insert-only desde la aplicación (regla 15, sección 4). El usuario de base de datos
+// de la app debe tener GRANT INSERT pero NUNCA UPDATE/DELETE sobre esta tabla —
+// se aplica vía migración SQL (ver prisma/migrations, Fase 0) y no puede forzarse
+// solo desde Prisma.
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String
+  action        String // ej. "CREATE", "UPDATE", "CANCEL", "STATE_CHANGE"
+  entityType    String // ej. "TutoringSession"
+  entityId      String
+  previousValue Json?
+  newValue      Json?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// Outbox de eventos de dominio (patrón transactional outbox): se escribe en la MISMA
+// transacción que el cambio de negocio, y un worker los entrega al notification-service con
+// reintentos. Así ningún correo se pierde si ese servicio está caído, y ninguno sale por un
+// cambio que hizo rollback.
+model DomainEvent {
+  id            String    @id @default(uuid())
+  type          String // ej. "tutoring.scheduled", "tutoring.completed"
+  aggregateId   String
+  payload       Json
+  createdAt     DateTime  @default(now())
+  publishedAt   DateTime?
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+
+  @@index([publishedAt, nextAttemptAt])
+  @@map("domain_events")
+}
+
+// Alimentada por los webhooks de dominio + n8n (Fase 4). El core solo escribe aquí;
+// el envío por correo/WhatsApp/SMS lo resuelve el orquestador externo.
+model Notification {
+  id                String   @id @default(uuid())
+  userId            String
+  type              String // ej. "SESSION_SCHEDULED", "SESSION_CANCELLED", "REMINDER_24H"
+  title             String
+  message           String
+  relatedEntityType String?
+  relatedEntityId   String?
+  isRead            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}

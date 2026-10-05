@@ -1,0 +1,27 @@
+# Desarrollo local: solo PostgreSQL. Los microservicios y micro frontends corren nativos
+# con recarga automática (`npm run dev` en la raíz — ver README.md).
+#
+# Una sola instancia de Postgres, una base (tutorias_dev) y un schema por microservicio:
+#   public   → tutoring-service
+#   identity → identity-service
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tutorias-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tutorias
+      POSTGRES_PASSWORD: tutorias
+      POSTGRES_DB: tutorias_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tutorias -d tutorias_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

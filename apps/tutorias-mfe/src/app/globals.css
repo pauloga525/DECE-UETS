@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-paper text-ink font-body antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  @apply font-heading font-semibold text-ink;
+}
+
+::selection {
+  @apply bg-accent text-white;
+}
+
+/* Agenda tipo Google Calendar (FullCalendar) con el sistema de diseño */
+.tutoring-calendar {
+  --fc-border-color: #e2e5e1;
+  --fc-today-bg-color: #e4efec66;
+  --fc-now-indicator-color: #a83f3f;
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #e2e5e1;
+  --fc-button-text-color: #141a17;
+  --fc-button-hover-bg-color: #f7f8f7;
+  --fc-button-hover-border-color: #1f6f5c;
+  --fc-button-active-bg-color: #e4efec;
+  --fc-button-active-border-color: #1f6f5c;
+  --fc-event-border-color: transparent;
+  font-size: 13px;
+}
+.tutoring-calendar .fc-toolbar-title {
+  @apply font-heading text-lg font-semibold text-ink;
+}
+.tutoring-calendar .fc-button {
+  @apply rounded-md text-sm font-medium capitalize shadow-none;
+}
+.tutoring-calendar .fc-button-active {
+  color: #123f34 !important;
+}
+.tutoring-calendar .fc-col-header-cell-cushion,
+.tutoring-calendar .fc-timegrid-slot-label-cushion {
+  @apply font-mono text-xs font-normal capitalize text-ink-soft;
+}
+.tutoring-calendar .fc-timegrid-event {
+  border-left-width: 3px;
+  border-radius: 6px;
+}
+.tutoring-calendar .fc-event {
+  cursor: pointer;
+}

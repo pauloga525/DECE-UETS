@@ -1,0 +1,62 @@
+// Base de datos propia del microservicio de identidad (database-per-service).
+// En desarrollo comparte la instancia de PostgreSQL con los demás servicios pero vive en
+// su propio schema ("identity", fijado en DATABASE_URL con ?schema=identity) — ningún otro
+// servicio lee ni escribe estas tablas: consultan identidad por HTTP (/auth/session) o
+// confían en los claims del JWT.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Roles globales de la plataforma DECE. Cada módulo decide qué puede hacer cada rol.
+// No existe rol de estudiante: las cuentas .est@uets.edu.ec no pueden iniciar sesión.
+enum Role {
+  ADMIN                  // Administrador / root: toda la plataforma y la gestión de usuarios
+  PSYCHOLOGY_COORDINATOR // Coordinador de psicólogos
+  PSYCHOLOGIST           // Psicólogo(a) del DECE
+  TEACHER                // Docente
+  ANIMATOR               // Animador de curso (nivel + paralelo)
+}
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  fullName    String?
+  pictureUrl  String?
+  // "sub" de Google — se fija en el primer login y desde ahí debe coincidir siempre.
+  // Evita que una cuenta de Google distinta que reutilice el mismo correo (ej. cuenta
+  // eliminada y recreada en Workspace) herede el acceso sin intervención de un admin.
+  googleSub   String?   @unique
+  role        Role
+  isActive    Boolean   @default(true)
+  // Se incrusta en cada JWT (claim "tv"). Incrementarlo revoca de inmediato todos los
+  // tokens ya emitidos: logout, desactivación o cambio de rol.
+  tokenVersion Int      @default(0)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  events AuthEvent[]
+
+  @@map("users")
+}
+
+// Bitácora de seguridad de identidad (logins, rechazos, cambios de usuario). Solo inserción.
+model AuthEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  type      String // LOGIN, LOGIN_REJECTED, LOGOUT, USER_CREATED, USER_UPDATED
+  email     String?
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("auth_events")
+}

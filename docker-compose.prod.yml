@@ -1,0 +1,151 @@
+# Compose de producción del Sistema DECE — sin bind mounts, todo corre desde imágenes.
+# Uso: ver docs/guia-despliegue.md.
+#
+# Topología (solo el portal se publica hacia afuera):
+#
+#   Navegador ──► Nginx :443 (HTTPS) ──► portal-shell 127.0.0.1:3001 ──► /tutorias/** ──► tutorias-mfe
+#                                  └───► /api/**      ──► api-gateway ──► identity-service
+#                                                                     └─► tutoring-service
+#                                                       postgres (schema identity + schema public)
+#
+# "name" fija el nombre de proyecto de Compose para que no comparta volúmenes con el
+# docker-compose.yml de desarrollo; los container_name llevan sufijo -prod por lo mismo.
+name: tutorias-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tutorias-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_OWNER_USER:-tutorias}
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?Definí DB_OWNER_PASSWORD en .env}
+      POSTGRES_DB: ${DB_NAME:-tutorias_prod}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_OWNER_USER:-tutorias} -d ${DB_NAME:-tutorias_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      # Solo localhost del servidor — se llega vía túnel SSH (ver guía, sección DBeaver).
+      # DB_PORT: cambiarlo si el servidor ya tiene otro Postgres en 5432.
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+
+  identity-service:
+    build:
+      context: ./services/identity-service
+    container_name: dece-identity-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      # Su propio schema ("identity"). Aplica sus migraciones al arrancar (ver Dockerfile).
+      DATABASE_URL: ${IDENTITY_DATABASE_URL:?Definí IDENTITY_DATABASE_URL en .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Definí GOOGLE_CLIENT_ID en .env}
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-uets.edu.ec}
+      BLOCKED_EMAIL_LOCAL_SUFFIXES: ${BLOCKED_EMAIL_LOCAL_SUFFIXES:-.est}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Definí JWT_PRIVATE_KEY en .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Definí INTERNAL_SERVICE_TOKEN en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tutoring-service:
+    build:
+      context: ./services/tutoring-service
+    container_name: dece-tutoring-prod
+    restart: unless-stopped
+    environment:
+      PORT: 4002
+      # Rol restringido (creado por la migración audit_log_insert_only) — nunca el rol
+      # dueño de las migraciones. Ver "Primer despliegue" en la guía.
+      DATABASE_URL: ${TUTORING_DATABASE_URL:?Definí TUTORING_DATABASE_URL en .env}
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      NOTIFICATION_SERVICE_URL: http://notification-service:4003
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Definí INTERNAL_SERVICE_TOKEN en .env}
+      SCHOOL_UTC_OFFSET_MINUTES: ${SCHOOL_UTC_OFFSET_MINUTES:--300}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: dece-notification-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4003
+      # Su propio schema ("notifications"). Aplica sus migraciones al arrancar.
+      DATABASE_URL: ${NOTIFICATION_DATABASE_URL:?Definí NOTIFICATION_DATABASE_URL en .env}
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Definí INTERNAL_SERVICE_TOKEN en .env}
+      PORTAL_URL: ${PUBLIC_URL:-http://localhost:3001}
+      MAIL_MODE: ${MAIL_MODE:-send}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:?Definí SMTP_USER en .env}
+      SMTP_PASS: ${SMTP_PASS:?Definí SMTP_PASS en .env}
+      MAIL_FROM: ${MAIL_FROM:-Sistema DECE UETS <noreply@uets.edu.ec>}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_started
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: dece-gateway-prod
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      TUTORING_SERVICE_URL: http://tutoring-service:4002
+      NOTIFICATION_SERVICE_URL: http://notification-service:4003
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost:3001}
+    ports:
+      # Solo localhost: el tráfico público entra por el portal. Útil para depurar desde el servidor.
+      - "127.0.0.1:${GATEWAY_PORT:-4000}:4000"
+    depends_on:
+      - identity-service
+      - tutoring-service
+      - notification-service
+
+  tutorias-mfe:
+    build:
+      context: ./apps/tutorias-mfe
+    container_name: dece-tutorias-mfe-prod
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+  portal-shell:
+    build:
+      context: ./apps/portal-shell
+      args:
+        # Los rewrites de Next.js se fijan al construir: si cambian, reconstruir la imagen.
+        TUTORIAS_MFE_URL: http://tutorias-mfe:3000
+        API_GATEWAY_URL: http://api-gateway:4000
+    container_name: dece-portal-prod
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      # Solo localhost: el acceso es por el proxy HTTPS (Nginx, ver deploy/nginx/dece.conf).
+      # PORTAL_PORT: cambiarlo si el servidor ya usa 3001 (y ajustar proxy_pass en el .conf).
+      - "127.0.0.1:${PORTAL_PORT:-3001}:3000"
+    depends_on:
+      - api-gateway
+      - tutorias-mfe
+
+volumes:
+  postgres_data:
