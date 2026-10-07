@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function SubjectsPage() {
   useRequireAuth(['ADMIN']);
   const [subjects, setSubjects] = useState<Subject[] | null>(null);
@@ -40,6 +41,7 @@ export default function SubjectsPage() {
     load();
   }
 
+  const pg = usePagination(subjects ?? []);
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl">Materias</h1>
@@ -60,7 +62,7 @@ export default function SubjectsPage() {
       {subjects && subjects.length > 0 && (
         <Card>
           <ul className="divide-y divide-line">
-            {subjects.map((s) => (
+            {pg.pageItems.map((s) => (
               <li key={s.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <span>
                   {s.name} <span className="font-mono text-ink-soft">· {s.code}</span>
@@ -73,6 +75,7 @@ export default function SubjectsPage() {
           </ul>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

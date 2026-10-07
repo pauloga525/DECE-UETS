@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 interface CourseStudent {
   id: string;
   firstName: string;
@@ -105,6 +106,9 @@ export default function AnimatorStudentsPage() {
       (s) => test(s) && (!q || `${s.firstName} ${s.lastName} ${s.identification}`.toLowerCase().includes(q)),
     );
   }, [students, search, filter]);
+
+  const pg = usePagination(filtered);
+  const pgUpcoming = usePagination(upcoming ?? []);
 
   if (coursesError) return <ErrorState title={coursesError} />;
   if (!courses) return <Spinner />;
@@ -215,7 +219,7 @@ export default function AnimatorStudentsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line">
-                        {filtered.map((s) => (
+                        {pg.pageItems.map((s) => (
                           <tr key={s.id} className="hover:bg-paper">
                             <td className="px-4 py-2">
                               <Link href={`/animador/estudiantes/${s.id}`} className="font-medium text-accent-ink">
@@ -241,6 +245,7 @@ export default function AnimatorStudentsPage() {
                   </div>
                 </Card>
               )}
+              <Pagination {...pg} />
             </>
           )}
 
@@ -261,7 +266,7 @@ export default function AnimatorStudentsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
-                      {upcoming.map((u) => (
+                      {pgUpcoming.pageItems.map((u) => (
                         <tr key={u.id} className="hover:bg-paper">
                           <td className="px-4 py-2 font-mono text-xs">{u.tutoringSession.date.slice(0, 10)}</td>
                           <td className="px-4 py-2 font-mono text-xs">
@@ -285,6 +290,7 @@ export default function AnimatorStudentsPage() {
                     </tbody>
                   </table>
                 </div>
+              <Pagination {...pgUpcoming} className="border-t border-line px-4 py-3" />
               </Card>
             ) : (
               <EmptyState title="No hay tutorías pendientes para los alumnos de tu curso." />

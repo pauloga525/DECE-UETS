@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 interface MyStudent {
   id: string;
   firstName: string;
@@ -67,6 +68,8 @@ export default function MyStudentsPage() {
         (!q || `${r.firstName} ${r.lastName} ${r.identification}`.toLowerCase().includes(q)),
     );
   }, [rows, subject, level, parallel, search]);
+
+  const pg = usePagination(filtered, 25);
 
   if (error) return <ErrorState title={error} />;
   if (!rows) return <Spinner />;
@@ -138,7 +141,7 @@ export default function MyStudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.slice(0, 500).map((r) => (
+                {pg.pageItems.map((r) => (
                   <tr key={`${r.assignmentId}-${r.id}`} className="hover:bg-paper">
                     <td className="px-4 py-2">
                       <Link href={`/estudiantes/${r.id}`} className="font-medium text-accent-ink">
@@ -158,13 +161,9 @@ export default function MyStudentsPage() {
               </tbody>
             </table>
           </div>
-          {filtered.length > 500 && (
-            <p className="border-t border-line px-4 py-2 text-xs text-ink-soft">
-              Se muestran 500 de {filtered.length}. Usa los filtros para acotar.
-            </p>
-          )}
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

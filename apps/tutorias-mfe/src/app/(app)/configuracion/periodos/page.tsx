@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function AcademicPeriodsPage() {
   useRequireAuth(['ADMIN']);
   const [periods, setPeriods] = useState<AcademicPeriod[] | null>(null);
@@ -42,6 +43,7 @@ export default function AcademicPeriodsPage() {
     load();
   }
 
+  const pg = usePagination(periods ?? []);
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl">Períodos académicos</h1>
@@ -63,7 +65,7 @@ export default function AcademicPeriodsPage() {
       {periods && periods.length > 0 && (
         <Card>
           <ul className="divide-y divide-line">
-            {periods.map((p) => (
+            {pg.pageItems.map((p) => (
               <li key={p.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <div>
                   <div className="font-medium">{p.name}</div>
@@ -79,6 +81,7 @@ export default function AcademicPeriodsPage() {
           </ul>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

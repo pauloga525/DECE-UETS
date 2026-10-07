@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/EmptyState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function DashboardPage() {
   const { user } = useAuth();
   const canCreate = user && ['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST', 'TEACHER'].includes(user.role);
@@ -53,6 +54,7 @@ export default function DashboardPage() {
     { label: 'Inasistencias hoy', value: absences },
   ];
 
+  const pg = usePagination(today, 10);
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -96,7 +98,7 @@ export default function DashboardPage() {
       {!error && sessions && sessions.length > 0 && (
         <Card>
           <ul className="divide-y divide-line">
-            {today.map((s) => (
+            {pg.pageItems.map((s) => (
               <li key={s.id}>
                 <Link
                   href={`/sesiones/${s.id}`}
@@ -117,6 +119,7 @@ export default function DashboardPage() {
           </ul>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 function formatDate(iso: string | null) {
   if (!iso) return 'Nunca';
   return new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
@@ -101,6 +102,7 @@ export default function UsersPage() {
 
   const emailLooksValid = /^[^@\s]+@uets\.edu\.ec$/i.test(email) && !/\.est@/i.test(email);
 
+  const pg = usePagination(visible);
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="mb-1 text-2xl">Usuarios y roles</h1>
@@ -195,7 +197,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {visible.map((u) => {
+                {pg.pageItems.map((u) => {
                   const isMe = u.id === me?.id;
                   return (
                     <tr key={u.id} className={u.isActive ? '' : 'opacity-60'}>
@@ -251,6 +253,7 @@ export default function UsersPage() {
           </div>
         </Card>
       )}
+      <Pagination {...pg} />
 
       <Modal open={!!pending} onClose={() => setPending(null)} title="Confirmar cambio">
         {pending && (

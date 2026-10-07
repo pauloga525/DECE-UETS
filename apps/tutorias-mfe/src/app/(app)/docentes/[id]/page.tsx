@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { EmptyState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 const DAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 export default function TeacherProfilePage() {
@@ -143,6 +144,8 @@ export default function TeacherProfilePage() {
     loadDayBlocks();
   }
 
+  const pgAssignments = usePagination(assignments, 10);
+  const pgRules = usePagination(rules, 10);
   if (!teacher) return <Spinner />;
 
   return (
@@ -230,7 +233,7 @@ export default function TeacherProfilePage() {
           {assignments.length > 0 && (
             <Card>
               <ul className="divide-y divide-line">
-                {assignments.map((a) => (
+                {pgAssignments.pageItems.map((a) => (
                   <li key={a.id} className="flex items-center justify-between px-4 py-3 text-sm">
                     <span>
                       {a.subject?.name} · {a.level?.name}{parallelsSuffix(a)}
@@ -241,6 +244,7 @@ export default function TeacherProfilePage() {
               </ul>
             </Card>
           )}
+          <Pagination {...pgAssignments} />
         </>
       )}
 
@@ -302,7 +306,7 @@ export default function TeacherProfilePage() {
           {rules.length > 0 && (
             <Card className="mb-4">
               <ul className="divide-y divide-line">
-                {rules.map((r) => (
+                {pgRules.pageItems.map((r) => (
                   <li key={r.id} className="flex items-center justify-between px-4 py-3 text-sm">
                     <span>
                       {r.teacherAssignment?.subject?.name} · {r.teacherAssignment?.level?.name}
@@ -318,6 +322,7 @@ export default function TeacherProfilePage() {
               </ul>
             </Card>
           )}
+          <Pagination {...pgRules} />
 
           <div className="mb-3 flex items-end gap-3">
             <Input label="Ver bloques del día" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function AvailabilityOverviewPage() {
   useRequireAuth(['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST']);
   const [rules, setRules] = useState<AvailabilityRule[] | null>(null);
@@ -33,6 +34,7 @@ export default function AvailabilityOverviewPage() {
     });
   }, [rules, search]);
 
+  const pg = usePagination(filtered);
   return (
     <div>
       <h1 className="mb-1 text-2xl">Disponibilidad de docentes</h1>
@@ -63,7 +65,7 @@ export default function AvailabilityOverviewPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {filtered.map((r) => (
+              {pg.pageItems.map((r) => (
                 <tr key={r.id} className="hover:bg-paper">
                   <td className="px-4 py-2">
                     <Link
@@ -89,6 +91,7 @@ export default function AvailabilityOverviewPage() {
           </table>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

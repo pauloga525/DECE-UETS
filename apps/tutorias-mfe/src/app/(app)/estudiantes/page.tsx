@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 import { PencilIcon, TrashIcon } from '@/components/ui/icons';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function StudentsPage() {
   const { user } = useRequireAuth(['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST', 'TEACHER']);
   const isAdmin = user?.role === 'ADMIN';
@@ -138,6 +139,7 @@ export default function StudentsPage() {
     }
   }
 
+  const pg = usePagination(students ?? []);
   return (
     <div>
       <h1 className="mb-6 text-2xl">Estudiantes</h1>
@@ -209,7 +211,7 @@ export default function StudentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {students.map((s) => (
+              {pg.pageItems.map((s) => (
                 <tr key={s.id} className="hover:bg-paper">
                   <td className="px-4 py-2 font-medium">
                     <Link href={`/estudiantes/${s.id}`} className="text-accent-ink">
@@ -258,6 +260,7 @@ export default function StudentsPage() {
           </table>
         </Card>
       )}
+      <Pagination {...pg} />
 
       <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Editar estudiante">
         {editTarget && (

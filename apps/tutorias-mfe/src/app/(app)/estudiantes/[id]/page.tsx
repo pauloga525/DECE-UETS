@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function StudentHistoryPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function StudentHistoryPage() {
       .catch(() => setError(true));
   }, [id]);
 
+  const pg = usePagination(history ?? [], 10);
   if (error) return <ErrorState title="No se pudo cargar el historial" />;
   if (!student || !history) return <Spinner />;
 
@@ -74,7 +76,7 @@ export default function StudentHistoryPage() {
       {history.length > 0 && (
         <Card>
           <ul className="divide-y divide-line">
-            {history.map((h) => (
+            {pg.pageItems.map((h) => (
               <li key={h.id}>
                 <Link href={`/sesiones/${h.tutoringSessionId}`} className="block px-5 py-3 hover:bg-paper">
                   <div className="mb-1 flex items-center justify-between">
@@ -100,6 +102,7 @@ export default function StudentHistoryPage() {
           </ul>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

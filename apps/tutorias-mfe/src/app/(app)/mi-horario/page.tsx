@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 type MyTeacher = Teacher & {
   assignments: (TeacherAssignment & { availabilityRules: AvailabilityRule[] })[];
 };
@@ -105,11 +106,13 @@ export default function MySchedulePage() {
     }
   }
 
+  const rules = me ? me.assignments.flatMap((a) => a.availabilityRules.map((r) => ({ ...r, assignment: a }))) : [];
+  const pg = usePagination(rules, 10);
+
   if (loadError) return <ErrorState title={loadError} onRetry={load} />;
   if (!me) return <Spinner />;
 
   const active = me.assignments.filter((a) => a.isActive);
-  const rules = me.assignments.flatMap((a) => a.availabilityRules.map((r) => ({ ...r, assignment: a })));
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -184,8 +187,9 @@ export default function MySchedulePage() {
             <p className="text-sm text-ink-soft">Todavía no declaraste ningún horario.</p>
           </CardBody>
         ) : (
+          <>
           <ul className="divide-y divide-line">
-            {rules.map((r) => (
+            {pg.pageItems.map((r) => (
               <li key={r.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">
@@ -227,6 +231,8 @@ export default function MySchedulePage() {
               </li>
             ))}
           </ul>
+          <Pagination {...pg} className="border-t border-line px-4 py-3" />
+          </>
         )}
       </Card>
     </div>

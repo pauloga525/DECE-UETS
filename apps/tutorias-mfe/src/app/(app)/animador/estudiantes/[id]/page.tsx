@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 const STATUS: Record<string, { label: string; tone: 'accent' | 'danger' | 'neutral' | 'waitlist' }> = {
   ATTENDED: { label: 'Asistió', tone: 'accent' },
   ABSENT: { label: 'Faltó', tone: 'danger' },
@@ -35,6 +36,7 @@ export default function AnimatorStudentHistoryPage() {
       .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar el historial'));
   }, [id]);
 
+  const pg = usePagination(data?.history ?? [], 10);
   if (error) return <ErrorState title={error} />;
   if (!data) return <Spinner />;
 
@@ -53,7 +55,7 @@ export default function AnimatorStudentHistoryPage() {
       ) : (
         <Card>
           <ul className="divide-y divide-line">
-            {data.history.map((h) => {
+            {pg.pageItems.map((h) => {
               const s = h.tutoringSession;
               const st = STATUS[h.status] ?? STATUS.ENROLLED;
               return (
@@ -89,6 +91,7 @@ export default function AnimatorStudentHistoryPage() {
           </ul>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

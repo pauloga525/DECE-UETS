@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function TeacherAssignmentsOverviewPage() {
   useRequireAuth(['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST']);
   const [assignments, setAssignments] = useState<TeacherAssignment[] | null>(null);
@@ -33,6 +34,7 @@ export default function TeacherAssignmentsOverviewPage() {
     );
   }, [assignments, search]);
 
+  const pg = usePagination(filtered);
   return (
     <div>
       <h1 className="mb-1 text-2xl">Asignaciones académicas</h1>
@@ -64,7 +66,7 @@ export default function TeacherAssignmentsOverviewPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {filtered.map((a) => (
+              {pg.pageItems.map((a) => (
                 <tr key={a.id} className="hover:bg-paper">
                   <td className="px-4 py-2">
                     <Link href={`/docentes/${a.teacherId}`} className="font-medium text-accent-ink">
@@ -86,6 +88,7 @@ export default function TeacherAssignmentsOverviewPage() {
           </table>
         </Card>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

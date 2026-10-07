@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, Spinner } from '@/components/ui/EmptyState';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function LevelsPage() {
   useRequireAuth(['ADMIN']);
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
@@ -78,6 +79,7 @@ export default function LevelsPage() {
     }
   }
 
+  const pg = usePagination(levels ?? [], 6);
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-2xl">Niveles, paralelos y animadores</h1>
@@ -111,7 +113,7 @@ export default function LevelsPage() {
       {levels && levels.length === 0 && <EmptyState title="Aún no hay niveles configurados para este período." />}
       {levels && levels.length > 0 && (
         <div className="flex flex-col gap-4">
-          {levels.map((l) => (
+          {pg.pageItems.map((l) => (
             <Card key={l.id}>
               <div className="border-b border-line px-5 py-3 font-medium">{l.name}</div>
               <ul className="divide-y divide-line">
@@ -150,6 +152,7 @@ export default function LevelsPage() {
           ))}
         </div>
       )}
+      <Pagination {...pg} />
     </div>
   );
 }

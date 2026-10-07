@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
 import { PencilIcon, TrashIcon } from '@/components/ui/icons';
 
+import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function TeachersPage() {
   const { user } = useRequireAuth(['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST']);
   const isAdmin = user?.role === 'ADMIN';
@@ -101,6 +102,7 @@ export default function TeachersPage() {
     }
   }
 
+  const pg = usePagination(filtered);
   return (
     <div>
       <h1 className="mb-6 text-2xl">Docentes</h1>
@@ -144,7 +146,7 @@ export default function TeachersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {filtered.map((t) => (
+              {pg.pageItems.map((t) => (
                 <tr key={t.id} className="hover:bg-paper">
                   <td className="px-4 py-2">
                     <Link href={`/docentes/${t.id}`} className="font-medium text-accent-ink">
@@ -192,6 +194,7 @@ export default function TeachersPage() {
           </table>
         </Card>
       )}
+      <Pagination {...pg} />
 
       <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Editar docente">
         {editTarget && (
