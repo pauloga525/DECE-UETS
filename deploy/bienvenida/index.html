@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema DECE · UETS</title>
+<!--
+  Página de entrada por HTTP (deploy/nginx/dece.conf, puerto 80). Existe porque, mientras un
+  equipo no tenga instalada la CA interna, el navegador bloquea el sitio HTTPS ANTES de cargarlo:
+  ningún modal dentro del sistema podría mostrarse. Aquí:
+    1. Se comprueba si el equipo ya confía en el certificado (pide /cert-ok por https).
+       Si confía → entra directo al sistema.
+    2. Si no → modal con pasos según el sistema operativo, descarga e instalador para Windows.
+-->
+<style>
+  :root {
+    --accent: #1f6f5c; --accent-ink: #123f34; --accent-tint: #e4efec;
+    --paper: #f7f8f7; --ink: #141a17; --ink-soft: #5b665f; --line: #e2e5e1;
+    --warn: #8a5a00; --warn-tint: #fdf3e1; --danger: #a33a2c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; max-width: 560px; width: 100%;
+          padding: 28px; box-shadow: 0 8px 30px rgba(20,26,23,.06); }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: var(--accent-ink); font-weight: 600; }
+  .brand span { display: inline-flex; width: 34px; height: 34px; border-radius: 8px; background: var(--accent);
+                color: #fff; align-items: center; justify-content: center; font-weight: 700; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; color: var(--ink-soft); }
+  .status { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px;
+            background: var(--paper); margin: 16px 0; }
+  .spin { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; animation: s 0.8s linear infinite; flex: none; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: pointer;
+         border-radius: 8px; padding: 11px 18px; font: inherit; font-weight: 600; text-decoration: none; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-ink); }
+  .btn.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn.secondary:hover { border-color: var(--accent); }
+  .btn.link { background: none; color: var(--accent-ink); padding: 6px 0; font-weight: 500; text-decoration: underline; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  /* Modal */
+  .backdrop { position: fixed; inset: 0; background: rgba(20,26,23,.45); display: none; align-items: center;
+              justify-content: center; padding: 16px; z-index: 10; }
+  .backdrop.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; max-width: 600px; width: 100%; max-height: calc(100vh - 32px);
+           overflow-y: auto; padding: 26px; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent-ink); background: var(--accent-tint);
+         border-radius: 999px; padding: 2px 10px; margin-bottom: 10px; }
+  ol.steps { counter-reset: n; list-style: none; padding: 0; margin: 16px 0; }
+  ol.steps > li { counter-increment: n; position: relative; padding: 0 0 14px 40px; }
+  ol.steps > li::before { content: counter(n); position: absolute; left: 0; top: 0; width: 28px; height: 28px;
+         border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 700;
+         display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  ol.steps b { color: var(--ink); }
+  .note { background: var(--warn-tint); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .ok { background: var(--accent-tint); color: var(--accent-ink); }
+  .err { color: var(--danger); font-size: 14px; margin-top: 10px; display: none; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+  .tabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font: inherit;
+                 font-size: 13px; cursor: pointer; color: var(--ink-soft); }
+  .tabs button.active { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+  .os { display: none; } .os.active { display: block; }
+  kbd { font: 12px ui-monospace, monospace; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand"><span>D</span> Sistema DECE · UETS</div>
+    <h1>Bienvenido</h1>
+    <p>Estamos preparando una conexión segura con el sistema.</p>
+    <div class="status" id="status"><div class="spin"></div><span>Comprobando tu equipo…</span></div>
+    <div class="row" id="actions" hidden>
+      <button class="btn primary" id="open-guide">Configurar este equipo</button>
+      <a class="btn link" id="enter-anyway" href="#">Ya lo hice, entrar al sistema</a>
+    </div>
+  </main>
+
+  <div class="backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="modal">
+      <span class="tag">Una sola vez por equipo · 1 minuto</span>
+      <h1 id="m-title">Habilita la conexión segura</h1>
+      <p>El sistema funciona dentro de la red del colegio con un certificado propio. Tu equipo necesita
+         reconocerlo una vez; después entrarás directamente, sin avisos de &ldquo;No es seguro&rdquo;.</p>
+
+      <div class="tabs" id="tabs">
+        <button data-os="windows">Windows</button>
+        <button data-os="mac">Mac</button>
+        <button data-os="android">Android</button>
+        <button data-os="ios">iPhone / iPad</button>
+      </div>
+
+      <section class="os" data-os="windows">
+        <ol class="steps">
+          <li><b>Descarga el instalador</b><br>
+            <a class="btn primary" style="margin-top:8px" href="/instalar-certificado-dece.cmd" download>Descargar instalador para Windows</a></li>
+          <li><b>Ábrelo con doble clic</b> desde la barra de descargas.<br>
+            Si Windows muestra &ldquo;Windows protegió su PC&rdquo;, pulsa <b>Más información</b> → <b>Ejecutar de todas formas</b>.</li>
+          <li>Aparece un aviso de seguridad preguntando si deseas instalar el certificado
+            <b>DECE-UETS-CA</b>: pulsa <b>Sí</b>.</li>
+          <li><b>Cierra el navegador por completo</b> (todas las ventanas) y vuelve a abrirlo.</li>
+        </ol>
+        <p style="font-size:13px">¿Prefieres hacerlo a mano? <a href="/ca.crt" download="DECE-UETS-CA.crt">Descarga el certificado</a>,
+          ábrelo → <b>Instalar certificado</b> → <b>Usuario actual</b> → <b>Colocar todos los certificados en el siguiente almacén</b>
+          → <b>Entidades de certificación raíz de confianza</b> → Finalizar.</p>
+      </section>
+
+      <section class="os" data-os="mac">
+        <ol class="steps">
+          <li><b>Descarga el certificado</b><br>
+            <a class="btn primary" style="margin-top:8px" href="/ca.crt" download="DECE-UETS-CA.crt">Descargar certificado</a></li>
+          <li>Ábrelo con doble clic: se abre <b>Acceso a Llaveros</b>. Elige el llavero <b>Inicio de sesión</b> y pulsa <b>Añadir</b>.</li>
+          <li>En la lista, haz doble clic en <b>DECE-UETS-CA</b> → <b>Confiar</b> →
+            &ldquo;Al utilizar este certificado&rdquo;: <b>Confiar siempre</b>. Cierra la ventana y escribe tu contraseña del Mac.</li>
+          <li>Cierra el navegador por completo (<kbd>⌘</kbd> <kbd>Q</kbd>) y vuelve a abrirlo.</li>
+        </ol>
+      </section>
+
+      <section class="os" data-os="android">
+        <ol class="steps">
+          <li><b>Descarga el certificado</b><br>
+            <a class="btn primary" style="margin-top:8px" href="/ca.crt" download="DECE-UETS-CA.crt">Descargar certificado</a></li>
+          <li>Abre <b>Ajustes</b> → <b>Seguridad</b> (o &ldquo;Seguridad y privacidad&rdquo;) → <b>Más ajustes de seguridad</b> /
+            <b>Cifrado y credenciales</b> → <b>Instalar un certificado</b> → <b>Certificado de CA</b>.</li>
+          <li>Pulsa <b>Instalar de todas formas</b>, confirma con tu PIN o huella y elige el archivo
+            <b>DECE-UETS-CA.crt</b> de Descargas.</li>
+          <li>Vuelve aquí y pulsa <b>Ya lo instalé, verificar</b>.</li>
+        </ol>
+        <p class="note">Los nombres del menú cambian según la marca del teléfono. Si no lo encuentras, busca
+          &ldquo;certificado&rdquo; en el buscador de Ajustes.</p>
+      </section>
+
+      <section class="os" data-os="ios">
+        <ol class="steps">
+          <li><b>Abre esta página en Safari</b> (no en Chrome) y descarga el certificado:<br>
+            <a class="btn primary" style="margin-top:8px" href="/ca.crt">Descargar certificado</a><br>
+            Pulsa <b>Permitir</b> cuando pregunte por el perfil de configuración.</li>
+          <li>Abre <b>Ajustes</b> → <b>Perfil descargado</b> (arriba) → <b>Instalar</b> → escribe tu código → <b>Instalar</b>.</li>
+          <li>Ve a <b>Ajustes</b> → <b>General</b> → <b>Información</b> → <b>Ajustes de confianza de certificados</b>
+            y activa <b>DECE-UETS-CA</b>.</li>
+          <li>Vuelve aquí y pulsa <b>Ya lo instalé, verificar</b>.</li>
+        </ol>
+      </section>
+
+      <div class="status" id="m-status" hidden></div>
+      <div class="row">
+        <button class="btn primary" id="verify">Ya lo instalé, verificar</button>
+        <button class="btn secondary" id="close">Cerrar</button>
+      </div>
+      <p class="err" id="m-err">Todavía no se reconoce el certificado. Revisa los pasos y asegúrate de
+        <b>cerrar y abrir de nuevo el navegador</b>. Si sigue sin funcionar, contacta a Sistemas.</p>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var HOST = location.hostname;
+  var APP = 'https://' + HOST + '/';
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ¿El equipo ya confía en el certificado? Un fetch a https falla con TypeError si no.
+  function trusted() {
+    var ctrl = 'AbortController' in window ? new AbortController() : null;
+    var t = setTimeout(function () { if (ctrl) ctrl.abort(); }, 5000);
+    return fetch('https://' + HOST + '/cert-ok?t=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: ctrl && ctrl.signal })
+      .then(function () { clearTimeout(t); return true; })
+      .catch(function () { clearTimeout(t); return false; });
+  }
+
+  function detectOS() {
+    var ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+    if (/Android/.test(ua)) return 'android';
+    if (/Mac OS X/.test(ua)) return 'mac';
+    return 'windows';
+  }
+
+  function showOS(os) {
+    document.querySelectorAll('#tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.os === os); });
+    document.querySelectorAll('section.os').forEach(function (s) { s.classList.toggle('active', s.dataset.os === os); });
+  }
+
+  function enter() {
+    $('status').className = 'status ok';
+    $('status').innerHTML = '<div class="spin"></div><span>Conexión segura lista. Entrando al sistema…</span>';
+    location.replace(APP);
+  }
+
+  function openModal() { $('modal').classList.add('open'); }
+
+  $('tabs').addEventListener('click', function (e) { if (e.target.dataset.os) showOS(e.target.dataset.os); });
+  $('open-guide').addEventListener('click', openModal);
+  $('close').addEventListener('click', function () { $('modal').classList.remove('open'); });
+  $('enter-anyway').addEventListener('click', function (e) { e.preventDefault(); location.href = APP; });
+  $('verify').addEventListener('click', function () {
+    $('m-err').style.display = 'none';
+    $('m-status').hidden = false;
+    $('m-status').className = 'status';
+    $('m-status').innerHTML = '<div class="spin"></div><span>Verificando…</span>';
+    trusted().then(function (ok) {
+      if (ok) {
+        $('m-status').className = 'status ok';
+        $('m-status').innerHTML = '<span>✔ ¡Listo! Tu equipo ya reconoce el certificado. Entrando…</span>';
+        setTimeout(function () { location.replace(APP); }, 900);
+      } else {
+        $('m-status').hidden = true;
+        $('m-err').style.display = 'block';
+      }
+    });
+  });
+
+  showOS(detectOS());
+  trusted().then(function (ok) {
+    if (ok) return enter();
+    $('status').innerHTML = '<span>Este equipo todavía no está configurado para la conexión segura.</span>';
+    $('actions').hidden = false;
+    openModal();
+  });
+})();
+</script>
+</body>
+</html>

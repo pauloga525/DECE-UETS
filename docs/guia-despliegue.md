@@ -177,7 +177,7 @@ Los otros sitios del servidor no se tocan: Nginx los distingue por `server_name`
 
 **5. Google Cloud** — en el Client ID, agrega `https://dece.192-168-200-31.nip.io` a *Orígenes de JavaScript autorizados* (ver [`guia-google-oauth.md`](guia-google-oauth.md)).
 
-**6. Instalar la CA en cada equipo (una sola vez)** — se descarga desde `http://dece.192-168-200-31.nip.io/ca.crt`:
+**6. Instalar la CA en cada equipo (una sola vez)** — lo guía el propio sistema: comparte con los usuarios la dirección **`http://dece.192-168-200-31.nip.io`** (con `http`, o `http://192.168.200.31`). Esa página de bienvenida (`deploy/bienvenida/index.html`, publicada por el script del paso 3 en `/var/www/dece-bienvenida`) comprueba si el equipo ya confía en el certificado: si confía, entra directo al sistema; si no, abre un modal con los pasos según el equipo y un **instalador de doble clic para Windows** (`instalar-certificado-dece.cmd`, instala la CA para el usuario actual, sin permisos de administrador). La pantalla de login también enlaza a esa guía. Pasos manuales, por si hacen falta (la CA está en `http://dece.192-168-200-31.nip.io/ca.crt`):
 
 | Equipo | Cómo |
 |---|---|

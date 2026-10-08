@@ -18,6 +18,13 @@ function LoginContent() {
   const next = safeNextPath(useSearchParams().get('next'));
   const [config, setConfig] = useState<AuthPublicConfig | null>(null);
   const [configError, setConfigError] = useState(false);
+  // En el servidor (red local con CA propia) se ofrece volver a la página de bienvenida por http,
+  // que guía la instalación del certificado. Se calcula en el cliente para no romper la hidratación.
+  const [certHelpUrl, setCertHelpUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const { protocol, hostname } = window.location;
+    if (protocol === 'https:' && hostname !== 'localhost') setCertHelpUrl(`http://${hostname}/`);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [devEmail, setDevEmail] = useState('');
@@ -127,6 +134,16 @@ function LoginContent() {
                 <li>• Las cuentas de estudiante (.est@{config.allowedDomain}) no tienen acceso.</li>
                 <li>• Tu cuenta debe estar habilitada por el administrador del sistema.</li>
               </ul>
+
+              {certHelpUrl && (
+                <p className="mt-6 rounded-md bg-paper px-3 py-2 text-xs text-ink-soft">
+                  ¿Tu navegador muestra &ldquo;No es seguro&rdquo; junto a la dirección?{' '}
+                  <a href={certHelpUrl} className="font-medium text-accent-ink underline">
+                    Configura este equipo
+                  </a>{' '}
+                  (una sola vez, 1 minuto).
+                </p>
+              )}
 
               {config.devLoginEnabled && (
                 <form onSubmit={handleDevSubmit} className="mt-8 rounded-lg border border-dashed border-status-warning p-4">
