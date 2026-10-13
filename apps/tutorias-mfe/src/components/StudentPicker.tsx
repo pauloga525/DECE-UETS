@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import type { Student } from '@/lib/types';
-import { fullName } from '@/lib/format';
+import { fullName, studentGroup } from '@/lib/format';
 import { Spinner } from '@/components/ui/EmptyState';
 
 const PAGE_SIZE = 10;
@@ -141,7 +141,7 @@ export function StudentPicker({
                       <span className="font-mono">{s.identification}</span>
                       {s.parallel && (
                         <span className="ml-2 rounded-full bg-status-scheduled-tint px-2 py-0.5 font-medium text-status-scheduled">
-                          Paralelo {s.parallel.name}
+                          {studentGroup(s, s.levelId !== levelId)}
                         </span>
                       )}
                     </span>

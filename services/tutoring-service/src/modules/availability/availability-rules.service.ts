@@ -3,8 +3,15 @@ import { SessionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/authenticated-user';
 import { assertActsOnOwnTeacher } from '../teachers/teacher-of-user';
+import { assignmentScopes } from '../teachers/assignment-scope';
 import { isMultipleOfBlock, splitIntoBlocks, timeRangesOverlap } from '../../common/time.util';
 import { CreateAvailabilityRuleDto, UpdateAvailabilityRuleDto } from './dto/availability-rule.dto';
+
+/** Dos horarios comparten bloques solo si sus inicios están separados por múltiplos de 40 min. */
+function blocksAligned(a: string, b: string) {
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return Math.abs(toMin(a) - toMin(b)) % 40 === 0;
+}
 
 @Injectable()
 export class AvailabilityRulesService {
@@ -36,12 +43,19 @@ export class AvailabilityRulesService {
         teacherAssignment: { teacherId: assignment.teacherId },
       },
     });
-    const overlaps = sameDayRules.some((r) =>
-      timeRangesOverlap(dto.startTime, dto.endTime, r.startTime, r.endTime),
+    // Excepción (pedido 2026-10-13): la misma materia en otra especialidad del mismo curso
+    // (p. ej. Matemáticas de 3.º Bach. IEME y de 3.º Bach. Mecanizado) puede compartir horario.
+    // No se duplican bloques: el bloque es uno solo (único por docente+fecha+hora) y admite
+    // alumnos de todas esas especialidades. Los bloques deben coincidir (mismo inicio cada 40 min).
+    const siblingIds = new Set((await assignmentScopes(this.prisma, assignment.id)).map((s) => s.assignmentId));
+    const overlaps = sameDayRules.some(
+      (r) =>
+        timeRangesOverlap(dto.startTime, dto.endTime, r.startTime, r.endTime) &&
+        !(siblingIds.has(r.teacherAssignmentId) && blocksAligned(dto.startTime, r.startTime)),
     );
     if (overlaps) {
       throw new BadRequestException(
-        'Este docente ya tiene otro horario declarado que se cruza con este rango',
+        'Este docente ya tiene otro horario declarado que se cruza con este rango. Solo la misma materia del mismo curso (otra especialidad) puede compartir horario, con los bloques alineados.',
       );
     }
 

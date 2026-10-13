@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { assignmentScopes, studentsInScopes } from '../teachers/assignment-scope';
 import { CreateStudentDto, UpdateStudentDto } from './dto/student.dto';
 
 @Injectable()
@@ -26,28 +27,28 @@ export class StudentsService {
    * asignación tiene paralelos, solo esos) — es lo que ofrece el selector al crear la tutoría.
    */
   async findAll(filters: { levelId?: string; parallelId?: string; search?: string; assignmentId?: string }) {
-    let levelId = filters.levelId;
-    let parallelIds: string[] | undefined;
+    let scope: Prisma.StudentWhereInput = { levelId: filters.levelId };
     if (filters.assignmentId) {
-      const assignment = await this.prisma.teacherAssignment.findUnique({
-        where: { id: filters.assignmentId },
-        include: { parallels: true },
-      });
-      if (!assignment) throw new NotFoundException('Asignación no encontrada');
-      levelId = assignment.levelId;
-      if (assignment.parallels.length) parallelIds = assignment.parallels.map((p) => p.parallelId);
+      // Incluye las especialidades hermanas del mismo curso con la misma materia.
+      const scopes = await assignmentScopes(this.prisma, filters.assignmentId);
+      if (!scopes.length) throw new NotFoundException('Asignación no encontrada');
+      scope = studentsInScopes(scopes);
     }
     return this.prisma.student.findMany({
       where: {
-        levelId,
-        parallelId: filters.parallelId ?? (parallelIds ? { in: parallelIds } : undefined),
-        OR: filters.search
-          ? [
-              { firstName: { contains: filters.search, mode: 'insensitive' } },
-              { lastName: { contains: filters.search, mode: 'insensitive' } },
-              { identification: { contains: filters.search, mode: 'insensitive' } },
-            ]
-          : undefined,
+        AND: [
+          scope,
+          filters.parallelId ? { parallelId: filters.parallelId } : {},
+          filters.search
+            ? {
+                OR: [
+                  { firstName: { contains: filters.search, mode: 'insensitive' } },
+                  { lastName: { contains: filters.search, mode: 'insensitive' } },
+                  { identification: { contains: filters.search, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+        ],
       },
       include: { level: true, parallel: true },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],

@@ -312,8 +312,8 @@ export default function CrearTutoriaPage() {
 
             <h3 className="mb-1 text-sm font-medium">Buscar estudiante</h3>
             <p className="mb-2 text-xs text-ink-soft">
-              Estudiantes de {selectedBlock.level?.name} de los paralelos donde el docente dicta esta materia: puedes reunir
-              alumnos de distintos paralelos en la misma tutoría.
+              Estudiantes de los paralelos donde el docente dicta esta materia en {selectedBlock.level?.name} y en las demás
+              especialidades del mismo curso: puedes reunir alumnos de distintos paralelos y especialidades en la misma tutoría.
             </p>
             <StudentPicker
               levelId={selectedBlock.levelId}

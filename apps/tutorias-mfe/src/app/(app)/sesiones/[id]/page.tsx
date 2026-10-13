@@ -7,7 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { EnrollmentReason, TutoringSession } from '@/lib/types';
 import { ENROLLMENT_REASON_LABEL, ENROLLMENT_STATUS_LABEL } from '@/lib/types';
-import { fullName } from '@/lib/format';
+import { fullName, studentGroup } from '@/lib/format';
 import { unlockAlarm } from '@/lib/alarm';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
@@ -162,7 +162,7 @@ export default function TutoringDetailPage() {
                   <div>
                     <div>
                       {e.student ? fullName(e.student) : '—'}
-                      {e.student?.parallel && <span className="ml-1 text-xs text-ink-soft">· Paralelo {e.student.parallel.name}</span>}
+                      {e.student && <span className="ml-1 text-xs text-ink-soft">· {studentGroup(e.student, e.student.levelId !== session.levelId)}</span>}
                     </div>
                     <div className="text-xs text-ink-soft">{ENROLLMENT_REASON_LABEL[e.reason]}</div>
                   </div>

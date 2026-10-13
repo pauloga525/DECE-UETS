@@ -21,3 +21,16 @@ export function parallelsSuffix(a: { parallels?: { parallel?: { name: string } }
   if (!names.length) return '';
   return ` · ${names.length === 1 ? 'Paralelo' : 'Paralelos'} ${names.join(', ')}`;
 }
+
+/**
+ * "Paralelo B" o, si la tutoría reúne varias especialidades del mismo curso, "Mecanizado y
+ * Construcciones Metálicas · Paralelo B" (pedido 2026-10-13).
+ */
+export function studentGroup(
+  student: { levelId?: string; level?: { stage?: string | null; name: string } | null; parallel?: { name: string } | null },
+  showLevel: boolean,
+): string {
+  const parallel = student.parallel ? `Paralelo ${student.parallel.name}` : '';
+  if (!showLevel || !student.level) return parallel;
+  return [student.level.stage || student.level.name, parallel].filter(Boolean).join(' · ');
+}

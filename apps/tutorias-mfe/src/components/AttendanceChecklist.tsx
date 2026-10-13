@@ -1,7 +1,7 @@
 'use client';
 
 import type { TutoringEnrollment } from '@/lib/types';
-import { fullName } from '@/lib/format';
+import { fullName, studentGroup } from '@/lib/format';
 
 /**
  * Lista de asistencia con casillas (pedido 2026-10-02): marcado = asistió, sin marcar =
@@ -19,6 +19,8 @@ export function AttendanceChecklist({
   onChange: (next: Set<string>) => void;
   disabled?: boolean;
 }) {
+  // Si la tutoría reúne varias especialidades, cada alumno muestra la suya.
+  const mixedLevels = new Set(enrollments.map((e) => e.student?.levelId)).size > 1;
   const all = enrollments.length > 0 && enrollments.every((e) => present.has(e.id));
 
   function toggle(id: string) {
@@ -60,7 +62,7 @@ export function AttendanceChecklist({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{e.student ? fullName(e.student) : '—'}</span>
-                  {e.student?.parallel && <span className="text-xs text-ink-soft">Paralelo {e.student.parallel.name}</span>}
+                  {e.student && <span className="text-xs text-ink-soft">{studentGroup(e.student, mixedLevels)}</span>}
                 </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${

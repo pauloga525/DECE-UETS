@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { EnrollmentStatus, Prisma } from '@prisma/client';
 import { timeRangesOverlap } from '../../common/time.util';
+import { assignmentScopes } from '../teachers/assignment-scope';
 
 export const ACTIVE_ENROLLMENT_STATUSES: EnrollmentStatus[] = [
   EnrollmentStatus.ENROLLED,
@@ -66,19 +67,24 @@ export async function assertStudentBelongsToLevel(
   const student = await tx.student.findUnique({ where: { id: studentId } });
   if (!student) throw new NotFoundException('Estudiante no encontrado');
   if (!student.isActive) throw new BadRequestException('El estudiante está inactivo.');
-  if (student.levelId !== levelId) {
+  if (!teacherAssignmentId) {
+    if (student.levelId !== levelId) {
+      throw new BadRequestException('El estudiante no pertenece al nivel de esta tutoría.');
+    }
+    return;
+  }
+  // La tutoría admite alumnos del nivel de su asignación y de las especialidades "hermanas" del
+  // mismo curso donde el docente dicta la misma materia (pedido 2026-10-13), cada uno en los
+  // paralelos asignados.
+  const scopes = await assignmentScopes(tx, teacherAssignmentId);
+  const scope = scopes.find((s) => s.levelId === student.levelId);
+  if (!scope) {
     throw new BadRequestException('El estudiante no pertenece al nivel de esta tutoría.');
   }
-  if (teacherAssignmentId) {
-    const parallels = await tx.teacherAssignmentParallel.findMany({
-      where: { teacherAssignmentId },
-      select: { parallelId: true },
-    });
-    if (parallels.length > 0 && !parallels.some((p) => p.parallelId === student.parallelId)) {
-      throw new BadRequestException(
-        'El estudiante no pertenece a un paralelo donde el docente dicta esta materia.',
-      );
-    }
+  if (scope.parallelIds.length > 0 && !scope.parallelIds.includes(student.parallelId)) {
+    throw new BadRequestException(
+      'El estudiante no pertenece a un paralelo donde el docente dicta esta materia.',
+    );
   }
 }
 

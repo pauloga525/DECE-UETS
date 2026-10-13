@@ -79,8 +79,8 @@ export class TutoringSessionsService {
         subject: true,
         level: true,
         parallel: true,
-        enrollments: { include: { student: { include: { parallel: true } }, attendance: true } },
-        waitlist: { include: { student: { include: { parallel: true } } }, orderBy: { position: 'asc' } },
+        enrollments: { include: { student: { include: { parallel: true, level: true } }, attendance: true } },
+        waitlist: { include: { student: { include: { parallel: true, level: true } } }, orderBy: { position: 'asc' } },
         report: true,
       },
     });

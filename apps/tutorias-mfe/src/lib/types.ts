@@ -84,6 +84,9 @@ export interface AcademicPeriod {
 export interface Level {
   id: string;
   name: string;
+  /** Especialidad del bachillerato (o etapa en EGB). */
+  stage?: string | null;
+  grade?: number | null;
   order: number;
   academicPeriodId: string;
   isActive: boolean;
