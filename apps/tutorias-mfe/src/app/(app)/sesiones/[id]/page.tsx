@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { EnrollmentReason, TutoringSession } from '@/lib/types';
-import { ENROLLMENT_REASON_LABEL } from '@/lib/types';
+import { ENROLLMENT_REASON_LABEL, ENROLLMENT_STATUS_LABEL } from '@/lib/types';
 import { fullName } from '@/lib/format';
 import { unlockAlarm } from '@/lib/alarm';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
@@ -168,7 +168,7 @@ export default function TutoringDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge tone={e.status === 'ATTENDED' ? 'accent' : e.status === 'ABSENT' ? 'danger' : 'neutral'}>
-                      {e.status}
+                      {ENROLLMENT_STATUS_LABEL[e.status]}
                     </Badge>
                     {canManage && session.status === 'SCHEDULED' && (
                       <button

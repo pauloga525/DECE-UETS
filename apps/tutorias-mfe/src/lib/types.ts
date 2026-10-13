@@ -6,6 +6,14 @@ export type SessionStatus = 'AVAILABLE' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLET
 
 export type EnrollmentStatus = 'ENROLLED' | 'ATTENDED' | 'ABSENT' | 'JUSTIFIED' | 'CANCELLED';
 
+export const ENROLLMENT_STATUS_LABEL: Record<EnrollmentStatus, string> = {
+  ENROLLED: 'Inscrito',
+  ATTENDED: 'Asistió',
+  ABSENT: 'Ausente',
+  JUSTIFIED: 'Justificado',
+  CANCELLED: 'Cancelado',
+};
+
 export type EnrollmentReason =
   | 'ACADEMIC_REINFORCEMENT'
   | 'LOW_PERFORMANCE'

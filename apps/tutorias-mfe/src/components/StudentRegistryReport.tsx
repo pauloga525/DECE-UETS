@@ -41,13 +41,18 @@ export function StudentRegistryReport({ query }: { query: string }) {
   const fullQuery = [query, `count=${count}`].filter(Boolean).join('&');
 
   useEffect(() => {
+    // Ignora respuestas viejas: si los filtros cambian antes de que llegue, no deben pisar a la nueva.
+    let stale = false;
     setData(null);
     setError(false);
     setPage(0);
     api
       .get<Registry>(`/reports/students-registry?${fullQuery}`)
-      .then(setData)
-      .catch(() => setError(true));
+      .then((d) => !stale && setData(d))
+      .catch(() => !stale && setError(true));
+    return () => {
+      stale = true;
+    };
   }, [fullQuery]);
 
   const filtered = useMemo(() => {

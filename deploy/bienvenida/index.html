@@ -97,11 +97,14 @@
         <ol class="steps">
           <li><b>Descarga el instalador</b><br>
             <a class="btn primary" style="margin-top:8px" href="/instalar-certificado-dece.cmd" download>Descargar instalador para Windows</a></li>
-          <li><b>Ábrelo con doble clic</b> desde la barra de descargas.<br>
-            Si Windows muestra &ldquo;Windows protegió su PC&rdquo;, pulsa <b>Más información</b> → <b>Ejecutar de todas formas</b>.</li>
-          <li>Aparece un aviso de seguridad preguntando si deseas instalar el certificado
-            <b>DECE-UETS-CA</b>: pulsa <b>Sí</b>.</li>
-          <li><b>Cierra el navegador por completo</b> (todas las ventanas) y vuelve a abrirlo.</li>
+          <li>En el panel <b>Descargas</b> (arriba a la derecha) aparece “podría dañar el dispositivo”:
+            pulsa <b>Conservar</b>. Es normal: el archivo lo genera el colegio.</li>
+          <li>Pulsa <b>Abrir archivo</b> y, en “Advertencia de seguridad de Abrir archivo”, pulsa <b>Ejecutar</b>.
+            (Si ves “Windows protegió su PC”: <b>Más información</b> → <b>Ejecutar de todas formas</b>.)</li>
+          <li>En el aviso que pregunta si deseas instalar el certificado <b>DECE-UETS-CA</b>, pulsa <b>Sí</b>.
+            La ventana negra dirá <b>LISTO</b>.</li>
+          <li><b>Cierra el navegador por completo</b> (todas las ventanas), vuelve a abrirlo y pulsa
+            <b>Ya lo instalé, verificar</b>.</li>
         </ol>
         <p style="font-size:13px">¿Prefieres hacerlo a mano? <a href="/ca.crt" download="DECE-UETS-CA.crt">Descarga el certificado</a>,
           ábrelo → <b>Instalar certificado</b> → <b>Usuario actual</b> → <b>Colocar todos los certificados en el siguiente almacén</b>
@@ -213,8 +216,18 @@
   });
 
   showOS(detectOS());
+  // ?guia muestra siempre la guía, aunque el equipo ya tenga el certificado (para probarla o ayudar a otros).
+  var forceGuide = /[?&]guia/.test(location.search);
   trusted().then(function (ok) {
-    if (ok) return enter();
+    if (ok && !forceGuide) return enter();
+    if (ok) {
+      $('status').className = 'status ok';
+      $('status').innerHTML = '<span>✔ Este equipo ya tiene el certificado. Abajo está la guía para otros equipos.</span>';
+      $('actions').hidden = false;
+      $('open-guide').textContent = 'Ver la guía de instalación';
+      $('enter-anyway').textContent = 'Entrar al sistema';
+      return openModal();
+    }
     $('status').innerHTML = '<span>Este equipo todavía no está configurado para la conexión segura.</span>';
     $('actions').hidden = false;
     openModal();

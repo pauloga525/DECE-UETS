@@ -99,7 +99,7 @@ function Report() {
 
       {/* Registro por alumno de SU curso: el servidor fuerza el paralelo del animador. */}
       <div className="mb-8">
-        <StudentRegistryReport query={query} />
+        {parallelId && <StudentRegistryReport query={query} />}
       </div>
 
       {error && <ErrorState title="No se pudo generar el reporte." />}
