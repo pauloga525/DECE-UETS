@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api, downloadFile } from '@/lib/api';
 import { StudentRegistryReport } from '@/components/StudentRegistryReport';
+import { ScheduleComplianceReport } from '@/components/ScheduleComplianceReport';
+import { useAuth } from '@/lib/auth';
 import type {
   AcademicPeriod,
   Level,
@@ -46,8 +48,11 @@ export default function ReportsPage() {
     levelId: '',
     parallelId: '',
   });
-  // Resumen general o Registro de tutorías por alumno (pedido 2026-10-02).
-  const [view, setView] = useState<'summary' | 'registry'>('summary');
+  // Resumen general, Registro de tutorías por alumno (pedido 2026-10-02) y, solo para el
+  // administrador y el coordinador, Horarios de docentes (pedido 2026-10-13).
+  const [view, setView] = useState<'summary' | 'registry' | 'schedules'>('summary');
+  const { user } = useAuth();
+  const canSeeSchedules = !!user && (user.role === 'ADMIN' || user.role === 'PSYCHOLOGY_COORDINATOR');
 
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [byMonth, setByMonth] = useState<ReportMonthBucket[] | null>(null);
@@ -105,11 +110,14 @@ export default function ReportsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl">Reportes</h1>
-        <Button variant="secondary" onClick={handleExport}>
-          Exportar CSV
-        </Button>
+        {view !== 'schedules' && (
+          <Button variant="secondary" onClick={handleExport}>
+            Exportar CSV
+          </Button>
+        )}
       </div>
 
+      {view !== 'schedules' && (
       <div className="mb-6 flex flex-wrap gap-3">
         <Select
           label="Período"
@@ -171,12 +179,14 @@ export default function ReportsPage() {
             ))}
         </Select>
       </div>
+      )}
 
       <div className="mb-6 inline-flex rounded-md border border-line bg-white p-0.5 text-sm" role="tablist">
         {(
           [
             ['summary', 'Resumen general'],
             ['registry', 'Registro de tutorías por alumno'],
+            ...(canSeeSchedules ? ([['schedules', 'Horarios de docentes']] as const) : []),
           ] as const
         ).map(([v, label]) => (
           <button
@@ -192,6 +202,7 @@ export default function ReportsPage() {
       </div>
 
       {view === 'registry' && <StudentRegistryReport query={toQuery(filters)} />}
+      {view === 'schedules' && canSeeSchedules && <ScheduleComplianceReport />}
 
       {view === 'summary' && error && <ErrorState title="No se pudo generar el reporte" />}
       {view === 'summary' && !error && !summary && <Spinner />}

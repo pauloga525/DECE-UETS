@@ -7,6 +7,9 @@ import { AuthenticatedUser } from '../auth/authenticated-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isAnimator, resolveAnimatorParallel } from '../animator/animator-scope';
 import { ReportsService } from './reports.service';
+import { ComplianceInclude, ScheduleComplianceService } from './schedule-compliance.service';
+
+const asInclude = (v?: string): ComplianceInclude => (v === 'pending' || v === 'complete' ? v : 'all');
 import { ReportFiltersDto } from './dto/report-filters.dto';
 
 // El animador genera reportes ÚNICAMENTE de su curso (pedido 2026-09-30): su parallelId se
@@ -27,6 +30,7 @@ const REPORT_ROLES = [
 export class ReportsController {
   constructor(
     private reports: ReportsService,
+    private compliance: ScheduleComplianceService,
     private prisma: PrismaService,
   ) {}
 
@@ -92,5 +96,46 @@ export class ReportsController {
   @ApiOperation({ summary: 'Registro de tutorías por alumno en Excel (.xlsx)' })
   async studentsRegistryXlsx(@Query() filters: ReportFiltersDto, @CurrentUser() user: AuthenticatedUser) {
     return new StreamableFile(await this.reports.studentRegistryXlsx(await this.scoped(filters, user)));
+  }
+
+  // ── Cumplimiento de horarios (pedido 2026-10-13) ──────────────────────
+  // Solo administrador y coordinador de psicólogos: supervisan que cada docente de cada
+  // materia haya declarado su horario de tutorías.
+  @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR)
+  @Get('schedule-compliance')
+  @ApiOperation({
+    summary: 'Horarios de tutoría declarados: por materia, qué docentes ya cargaron su horario (Admin/Coordinador)',
+  })
+  scheduleCompliance(@Query('subjectId') subjectId?: string, @Query('academicPeriodId') academicPeriodId?: string) {
+    return this.compliance.compute({ subjectId, academicPeriodId });
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR)
+  @Get('schedule-compliance.xlsx')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="horarios-docentes.xlsx"')
+  @ApiOperation({ summary: 'Horarios de tutoría declarados, en Excel (Admin/Coordinador)' })
+  async scheduleComplianceXlsx(
+    @Query('subjectId') subjectId?: string,
+    @Query('academicPeriodId') academicPeriodId?: string,
+    @Query('include') include?: string,
+  ) {
+    return new StreamableFile(await this.compliance.xlsx({ subjectId, academicPeriodId, include: asInclude(include) }));
+  }
+
+  @Roles(UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR)
+  @Get('schedule-compliance.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'attachment; filename="horarios-docentes.pdf"')
+  @ApiOperation({
+    summary: 'Horarios de tutoría declarados, en PDF: por materia, docentes que faltan y que ya cargaron (Admin/Coordinador)',
+    description: 'subjectId opcional (sin él, todas las materias). include=all|pending|complete.',
+  })
+  async scheduleCompliancePdf(
+    @Query('subjectId') subjectId?: string,
+    @Query('academicPeriodId') academicPeriodId?: string,
+    @Query('include') include?: string,
+  ) {
+    return new StreamableFile(await this.compliance.pdf({ subjectId, academicPeriodId, include: asInclude(include) }));
   }
 }
