@@ -20,6 +20,7 @@ interface Row {
   levels: { level: string; parallels: string[]; covered: boolean }[];
   rules: number;
   weeklyMinutes: number;
+  schedule: { day: string; startTime: string; endTime: string; level: string; location: string | null }[];
 }
 interface SubjectRow {
   subjectId: string;
@@ -259,6 +260,7 @@ export function ScheduleComplianceReport({ academicPeriodId }: { academicPeriodI
                     <th className="px-4 py-2">Materia</th>
                     <th className="px-4 py-2">Estado</th>
                     <th className="px-4 py-2">Niveles sin horario</th>
+                    <th className="px-4 py-2">Horario cargado</th>
                     <th className="px-4 py-2 text-center">Horarios</th>
                     <th className="px-4 py-2 text-center">Min/semana</th>
                   </tr>
@@ -283,6 +285,26 @@ export function ScheduleComplianceReport({ academicPeriodId }: { academicPeriodI
                           <ul className="space-y-0.5 text-status-danger">
                             {r.levels.filter((l) => !l.covered).map((l) => (
                               <li key={l.level}>{fmtLevel(l)}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        {r.schedule.length === 0 ? (
+                          <span className="text-ink-soft">—</span>
+                        ) : (
+                          <ul className="space-y-1">
+                            {r.schedule.map((x, i) => (
+                              <li key={i}>
+                                <span className="font-medium">{x.day}</span>{' '}
+                                <span className="font-mono">
+                                  {x.startTime}–{x.endTime}
+                                </span>
+                                <div className="text-ink-soft">
+                                  {x.level}
+                                  {x.location ? ` · ${x.location}` : ''}
+                                </div>
+                              </li>
                             ))}
                           </ul>
                         )}

@@ -17,6 +17,26 @@ export interface ComplianceRow {
   /** Horarios activos declarados para esta materia y minutos semanales de tutoría. */
   rules: number;
   weeklyMinutes: number;
+  /** Horario declarado (pedido 2026-10-14): día, hora, nivel y lugar de cada horario activo. */
+  schedule: ScheduleSlot[];
+}
+
+export interface ScheduleSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+  level: string;
+  levels: string[];
+  location: string | null;
+}
+
+/** "3.º Bachillerato (Mecatrónica, Desarrollo de Software)" si comparten el curso; si no, separados por " / ". */
+function joinLevels(levels: string[]): string {
+  if (levels.length === 1) return levels[0];
+  const prefix = (l: string) => l.split(' ').slice(0, 2).join(' ');
+  const p = prefix(levels[0]);
+  if (levels.every((l) => prefix(l) === p)) return `${p} (${levels.map((l) => l.slice(p.length).trim()).join(', ')})`;
+  return levels.join(' / ');
 }
 
 export interface ComplianceSubject {
@@ -43,6 +63,20 @@ const INCLUDE_LABEL: Record<ComplianceInclude, string> = {
   complete: 'Solo docentes que ya cargaron su horario',
 };
 const fmtLevel = (l: { level: string; parallels: string[] }) => (l.parallels.length ? `${l.level} (${l.parallels.join(', ')})` : l.level);
+
+const DAY_LABEL: Record<string, string> = {
+  MONDAY: 'Lunes',
+  TUESDAY: 'Martes',
+  WEDNESDAY: 'Miércoles',
+  THURSDAY: 'Jueves',
+  FRIDAY: 'Viernes',
+  SATURDAY: 'Sábado',
+  SUNDAY: 'Domingo',
+};
+const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+/** "Lunes 14:00–14:40 · 3.º Bach. Mecatrónica · Sala de profesores" */
+export const fmtSlot = (x: ScheduleSlot) =>
+  [`${x.day} ${x.startTime}–${x.endTime}`, x.level.replace('Bachillerato', 'Bach.'), x.location].filter(Boolean).join(' · ');
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 export const STATUS_LABEL: Record<ComplianceStatus, string> = {
@@ -106,7 +140,18 @@ export class ScheduleComplianceService {
         .sort((x, y) => x.order - y.order || x.level.localeCompare(y.level, 'es'))
         .map(({ order: _order, ...l }) => l);
       const coveredCount = levels.filter((l) => l.covered).length;
-      const rules = list.flatMap((a) => a.availabilityRules);
+      const schedule = list
+        .flatMap((a) => a.availabilityRules.map((r) => ({ r, level: a.level.name })))
+        .sort((x, y) => DAY_ORDER.indexOf(x.r.dayOfWeek) - DAY_ORDER.indexOf(y.r.dayOfWeek) || x.r.startTime.localeCompare(y.r.startTime))
+        .map(({ r, level }) => ({ day: DAY_LABEL[r.dayOfWeek] ?? r.dayOfWeek, startTime: r.startTime, endTime: r.endTime, level, location: r.location }))
+        // Un mismo horario compartido por varias especialidades del curso va en una sola línea.
+        .reduce<ScheduleSlot[]>((acc, x) => {
+          const same = acc.find((y) => y.day === x.day && y.startTime === x.startTime && y.endTime === x.endTime && y.location === x.location);
+          if (same) same.levels.push(x.level);
+          else acc.push({ ...x, levels: [x.level] });
+          return acc;
+        }, [])
+        .map((x) => ({ ...x, level: joinLevels(x.levels) }));
       const t = list[0].teacher;
       rows.push({
         teacherId: t.id,
@@ -116,8 +161,10 @@ export class ScheduleComplianceService {
         subject: list[0].subject.name,
         status: coveredCount === levels.length ? 'COMPLETE' : coveredCount === 0 ? 'NONE' : 'PARTIAL',
         levels,
-        rules: rules.length,
-        weeklyMinutes: rules.reduce((m, r) => m + (toMin(r.endTime) - toMin(r.startTime)), 0),
+        // Horarios distintos y tiempo real del docente: un horario compartido entre especialidades cuenta una vez.
+        rules: schedule.length,
+        weeklyMinutes: schedule.reduce((m, x) => m + (toMin(x.endTime) - toMin(x.startTime)), 0),
+        schedule,
       });
     }
     rows.sort((a, b) => a.subject.localeCompare(b.subject, 'es') || a.teacher.localeCompare(b.teacher, 'es'));
@@ -172,7 +219,7 @@ export class ScheduleComplianceService {
     s1.columns = [{ width: 52 }, { width: 11 }, { width: 11 }, { width: 11 }, { width: 13 }, { width: 12 }];
 
     const s2 = wb.addWorksheet('Por docente', { views: [{ state: 'frozen', ySplit: 1 }] });
-    s2.addRow(['Materia', 'Docente', 'Correo', 'Estado', 'Niveles con horario', 'Niveles sin horario', 'Horarios', 'Minutos/semana']);
+    s2.addRow(['Materia', 'Docente', 'Correo', 'Estado', 'Niveles con horario', 'Niveles sin horario', 'Horario (día · hora · nivel · lugar)', 'Horarios', 'Minutos/semana']);
     head(s2, 1);
     for (const r of rows) {
       const fmt = (l: ComplianceRow['levels'][number]) => (l.parallels.length ? `${l.level} (${l.parallels.join(', ')})` : l.level);
@@ -183,6 +230,7 @@ export class ScheduleComplianceService {
         STATUS_LABEL[r.status],
         r.levels.filter((l) => l.covered).map(fmt).join('; '),
         r.levels.filter((l) => !l.covered).map(fmt).join('; '),
+        r.schedule.map(fmtSlot).join('\n'),
         r.rules,
         r.weeklyMinutes,
       ]);
@@ -191,8 +239,9 @@ export class ScheduleComplianceService {
         row.getCell(4).font = { ...font, bold: true, color: { argb: r.status === 'NONE' ? 'FFA33A2C' : 'FF8A5A00' } };
       }
     }
-    s2.columns = [{ width: 36 }, { width: 38 }, { width: 30 }, { width: 13 }, { width: 50 }, { width: 50 }, { width: 10 }, { width: 15 }];
-    s2.autoFilter = { from: 'A1', to: 'H1' };
+    s2.columns = [{ width: 36 }, { width: 38 }, { width: 30 }, { width: 13 }, { width: 50 }, { width: 50 }, { width: 60 }, { width: 10 }, { width: 15 }];
+    s2.getColumn(7).alignment = { wrapText: true, vertical: 'top' };
+    s2.autoFilter = { from: 'A1', to: 'I1' };
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
 
@@ -266,7 +315,7 @@ export class ScheduleComplianceService {
     type Col = { title: string; w: number; align?: 'left' | 'center' };
     const table = (cols: Col[], rows: { cells: string[]; colors?: (string | undefined)[] }[]) => {
       const header = () => {
-        ensure(22);
+        ensure(60);
         const y = doc.y;
         let x = L;
         doc.rect(L, y, W, 18).fill('#e4efec');
@@ -300,7 +349,7 @@ export class ScheduleComplianceService {
       doc.y += 10;
     };
     const section = (title: string, color = GREEN) => {
-      ensure(44);
+      ensure(80);
       doc.fill(color).font('Helvetica-Bold').fontSize(11.5).text(title, L, doc.y);
       doc.y += 4;
     };
@@ -355,14 +404,21 @@ export class ScheduleComplianceService {
         section(`Faltan por cargar su horario (${pending.length})`, RED);
         table(
           [
-            { title: 'Docente', w: W * 0.28 },
-            { title: 'Correo', w: W * 0.2 },
-            { title: 'Estado', w: W * 0.1 },
-            { title: 'Niveles sin horario', w: W * 0.42 },
+            { title: 'Docente', w: W * 0.22 },
+            { title: 'Correo', w: W * 0.16 },
+            { title: 'Estado', w: W * 0.08 },
+            { title: 'Niveles sin horario', w: W * 0.26 },
+            { title: 'Horario ya cargado', w: W * 0.28 },
           ],
           pending.map((r) => ({
-            cells: [r.teacher, r.email, STATUS_LABEL[r.status], r.levels.filter((l) => !l.covered).map(fmtLevel).join('\n')],
-            colors: [undefined, SOFT, r.status === 'NONE' ? RED : AMBER, RED],
+            cells: [
+              r.teacher,
+              r.email,
+              STATUS_LABEL[r.status],
+              r.levels.filter((l) => !l.covered).map(fmtLevel).join('\n'),
+              r.schedule.map(fmtSlot).join('\n'),
+            ],
+            colors: [undefined, SOFT, r.status === 'NONE' ? RED : AMBER, RED, undefined],
           })),
         );
       }
@@ -370,14 +426,14 @@ export class ScheduleComplianceService {
         section(`Ya cargaron su horario (${ok.length})`);
         table(
           [
-            { title: 'Docente', w: W * 0.28 },
-            { title: 'Correo', w: W * 0.2 },
-            { title: 'Niveles con horario', w: W * 0.36 },
-            { title: 'Horarios', w: W * 0.08, align: 'center' },
-            { title: 'Min/sem.', w: W * 0.08, align: 'center' },
+            { title: 'Docente', w: W * 0.22 },
+            { title: 'Correo', w: W * 0.16 },
+            { title: 'Horario (día · hora · nivel · lugar)', w: W * 0.48 },
+            { title: 'Horarios', w: W * 0.07, align: 'center' },
+            { title: 'Min/sem.', w: W * 0.07, align: 'center' },
           ],
           ok.map((r) => ({
-            cells: [r.teacher, r.email, r.levels.map(fmtLevel).join('\n'), String(r.rules), String(r.weeklyMinutes)],
+            cells: [r.teacher, r.email, r.schedule.map(fmtSlot).join('\n'), String(r.rules), String(r.weeklyMinutes)],
             colors: [undefined, SOFT],
           })),
         );
