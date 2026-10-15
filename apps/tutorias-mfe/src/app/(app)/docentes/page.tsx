@@ -33,6 +33,7 @@ export default function TeachersPage() {
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export default function TeachersPage() {
     setEditFirstName(t.firstName);
     setEditLastName(t.lastName);
     setEditPhone(t.phone ?? '');
+    setEditEmail(t.email);
     setEditError(null);
   }
 
@@ -94,6 +96,7 @@ export default function TeachersPage() {
         firstName: editFirstName,
         lastName: editLastName,
         phone: editPhone || undefined,
+        email: editEmail.trim(),
       });
       setEditTarget(null);
       load();
@@ -202,6 +205,13 @@ export default function TeachersPage() {
             <div className="flex flex-col gap-3">
               <Input label="Nombres" value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} />
               <Input label="Apellidos" value={editLastName} onChange={(e) => setEditLastName(e.target.value)} />
+              <Input label="Correo institucional" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+              {editEmail.trim().toLowerCase() !== editTarget.email && (
+                <p className="rounded-md bg-status-warning-tint px-3 py-2 text-xs text-status-warning">
+                  Al cambiar el correo, el docente deberá iniciar sesión con el nuevo correo (@uets.edu.ec); sus sesiones
+                  abiertas se cerrarán. Su cuenta de acceso, sus tutorías y el curso que anima pasan al correo nuevo.
+                </p>
+              )}
               <Input label="Teléfono" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
             </div>
             {editError && <p className="mt-2 text-sm text-status-danger">{editError}</p>}
@@ -209,7 +219,7 @@ export default function TeachersPage() {
               <Button variant="secondary" onClick={() => setEditTarget(null)}>
                 Cancelar
               </Button>
-              <Button disabled={!editFirstName || !editLastName} onClick={submitEdit}>
+              <Button disabled={!editFirstName || !editLastName || !/^[^\s@]+@[^\s@]+$/.test(editEmail.trim())} onClick={submitEdit}>
                 Guardar
               </Button>
             </div>

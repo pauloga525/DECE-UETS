@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { DevLogin, ListDevLoginUsers, LoginWithGoogle } from './application/use-cases/login.use-cases';
 import { GetSession, Logout } from './application/use-cases/session.use-cases';
-import { CreateUser, ListUsers, UpdateUser } from './application/use-cases/user-admin.use-cases';
+import { ChangeUserEmail, CreateUser, ListUsers, UpdateUser } from './application/use-cases/user-admin.use-cases';
 import {
   AUTH_EVENT_LOG,
   AuthEventLog,
@@ -107,6 +107,12 @@ const toLoginDeps = (...[users, events, tokens, cfg]: LoginDepsArgs) => ({
       inject: [USER_REPOSITORY, AUTH_EVENT_LOG, APP_CONFIG],
       useFactory: (u: UserRepository, e: AuthEventLog, cfg: AppConfig) =>
         new CreateUser(u, e, cfg.emailPolicy),
+    },
+    {
+      provide: ChangeUserEmail,
+      inject: [USER_REPOSITORY, AUTH_EVENT_LOG, APP_CONFIG],
+      useFactory: (u: UserRepository, e: AuthEventLog, cfg: AppConfig) =>
+        new ChangeUserEmail(u, e, cfg.emailPolicy),
     },
     {
       provide: UpdateUser,

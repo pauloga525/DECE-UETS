@@ -107,6 +107,17 @@ export class User {
     this.props.fullName = fullName;
   }
 
+  /**
+   * Cambia el correo institucional (p. ej. estaba mal escrito). Se desvincula la cuenta de Google
+   * anterior —el próximo login con el correo nuevo vincula la correcta— y se cierran sus sesiones.
+   */
+  changeEmail(email: string) {
+    if (email === this.props.email) return;
+    this.props.email = email;
+    this.props.googleSub = null;
+    this.revokeSessions();
+  }
+
   toSnapshot(): UserProps {
     return { ...this.props };
   }

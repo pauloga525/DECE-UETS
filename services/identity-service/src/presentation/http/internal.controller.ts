@@ -1,7 +1,7 @@
-import { Controller, ForbiddenException, Get, Headers, Inject, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Inject, Post, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { timingSafeEqual } from 'crypto';
-import { ListUsers } from '../../application/use-cases/user-admin.use-cases';
+import { ChangeUserEmail, ListUsers } from '../../application/use-cases/user-admin.use-cases';
 import { Role, ROLES } from '../../domain/entities/user.entity';
 import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { Public } from './decorators';
@@ -17,7 +17,18 @@ export class InternalController {
   constructor(
     @Inject(APP_CONFIG) private config: AppConfig,
     private listUsers: ListUsers,
+    private changeUserEmail: ChangeUserEmail,
   ) {}
+
+  /** Tutorías cambió el correo de un docente: renombra (o habilita) su cuenta de acceso. */
+  @Post('users/change-email')
+  async changeEmail(
+    @Headers('x-internal-token') token: string | undefined,
+    @Body() body: { oldEmail: string; newEmail: string; fullName?: string | null },
+  ) {
+    this.assertToken(token);
+    return this.changeUserEmail.execute({ ...body, role: 'TEACHER' });
+  }
 
   /** Usuarios activos con alguno de los roles dados — ej. el equipo DECE a notificar. */
   @Get('users')

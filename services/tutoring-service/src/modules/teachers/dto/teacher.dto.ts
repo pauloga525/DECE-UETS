@@ -18,6 +18,11 @@ export class CreateTeacherDto {
 }
 
 export class UpdateTeacherDto {
+  /** Correo institucional; al cambiarlo se actualiza también su cuenta de acceso (identity). */
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)
