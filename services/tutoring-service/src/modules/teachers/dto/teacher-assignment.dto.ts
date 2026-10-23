@@ -1,22 +1,23 @@
-import { IsArray, IsBoolean, IsOptional, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional } from 'class-validator';
+import { IsId } from '../../../common/is-id.validator';
 
 export class CreateTeacherAssignmentDto {
-  @IsUUID()
+  @IsId()
   teacherId!: string;
 
-  @IsUUID()
+  @IsId()
   subjectId!: string;
 
-  @IsUUID()
+  @IsId()
   levelId!: string;
 
-  @IsUUID()
+  @IsId()
   academicPeriodId!: string;
 
   /** Paralelos donde dicta la materia. Vacío u omitido = todo el nivel. */
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsId({ each: true })
   parallelIds?: string[];
 }
 
@@ -28,6 +29,6 @@ export class UpdateTeacherAssignmentDto {
   /** Reemplaza los paralelos de la asignación. Vacío = todo el nivel. */
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsId({ each: true })
   parallelIds?: string[];
 }

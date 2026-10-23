@@ -4,15 +4,15 @@ import {
   IsEnum,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AttendanceStatus } from '@prisma/client';
+import { IsId } from '../../../common/is-id.validator';
 
 export class AttendanceRecordInput {
   @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @IsId()
   enrollmentId!: string;
 
   @ApiProperty({ enum: AttendanceStatus })

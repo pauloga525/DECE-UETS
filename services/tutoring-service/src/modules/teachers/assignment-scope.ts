@@ -53,3 +53,14 @@ export function studentsInScopes(scopes: AssignmentScope[]): Prisma.StudentWhere
     OR: scopes.map((s) => ({ levelId: s.levelId, ...(s.parallelIds.length ? { parallelId: { in: s.parallelIds } } : {}) })),
   };
 }
+
+/**
+ * Clave del bloque de tutoría dentro de un docente (TutoringSession.slotKey): materia + curso sin
+ * la especialidad. Así las especialidades hermanas comparten un solo bloque, y materias técnicas
+ * distintas a la misma hora tienen cada una el suyo (pedido 2026-10-23). Debe coincidir con el
+ * cálculo de la migración 20261023120000_materias_tecnicas.
+ */
+export function slotKeyOf(subjectId: string, level: { id: string; grade: number | null; educationLevel: string | null }) {
+  const course = level.grade != null && level.educationLevel ? `${level.educationLevel}#${level.grade}` : level.id;
+  return `${subjectId}:${course}`;
+}

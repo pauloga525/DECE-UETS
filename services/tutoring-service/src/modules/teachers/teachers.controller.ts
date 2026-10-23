@@ -170,8 +170,18 @@ export class TeachersController {
 
   @Roles(...WRITE_ROLES)
   @Patch('assignments/:id')
-  @ApiOperation({ summary: 'Activar/desactivar una asignación docente-materia-nivel (Admin)' })
+  @ApiOperation({ summary: 'Activar/desactivar una asignación o cambiar sus paralelos (Admin)' })
   updateAssignment(@Param('id') id: string, @Body() dto: UpdateTeacherAssignmentDto) {
     return this.assignments.update(id, dto);
+  }
+
+  @Roles(...WRITE_ROLES)
+  @Delete('assignments/:id')
+  @ApiOperation({
+    summary: 'Quitar una materia a un docente (Admin)',
+    description: 'Solo si no tiene tutorías con historial — si tiene, 409 (desactivarla en su lugar).',
+  })
+  removeAssignment(@Param('id') id: string) {
+    return this.assignments.remove(id);
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SessionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateTeacherAssignmentDto,
@@ -71,6 +71,37 @@ export class TeacherAssignmentsService {
         }),
       },
       include: ASSIGNMENT_INCLUDE,
+    });
+  }
+
+  /**
+   * Quitar una materia a un docente (Admin, pedido 2026-10-23). Solo si no tiene tutorías con
+   * historial (agendadas, dictadas, canceladas o con alumnos): esas se conservan y la asignación
+   * se desactiva en su lugar. Se borran sus horarios y los bloques libres.
+   */
+  async remove(id: string) {
+    const existing = await this.prisma.teacherAssignment.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Asignación no encontrada');
+    const used = await this.prisma.tutoringSession.count({
+      where: {
+        teacherAssignmentId: id,
+        OR: [
+          { status: { not: SessionStatus.AVAILABLE } },
+          { enrollments: { some: {} } },
+          { report: { isNot: null } },
+        ],
+      },
+    });
+    if (used > 0) {
+      throw new ConflictException(
+        `Esta materia ya tiene ${used} tutoría(s) registrada(s) y no se puede eliminar sin perder el historial. Desactívala en su lugar.`,
+      );
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tutoringSession.deleteMany({ where: { teacherAssignmentId: id } });
+      await tx.teacherAvailabilityRule.deleteMany({ where: { teacherAssignmentId: id } });
+      await tx.teacherAssignment.delete({ where: { id } });
+      return { deleted: true };
     });
   }
 }

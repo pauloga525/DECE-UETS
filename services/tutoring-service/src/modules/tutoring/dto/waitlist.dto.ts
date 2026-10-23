@@ -1,10 +1,11 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EnrollmentReason } from '@prisma/client';
+import { IsId } from '../../../common/is-id.validator';
 
 export class AddToWaitlistDto {
   @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @IsId()
   studentId!: string;
 
   @ApiProperty({ enum: EnrollmentReason })

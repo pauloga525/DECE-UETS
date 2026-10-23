@@ -4,6 +4,7 @@ import { DayOfWeek, Prisma, SessionStatus, TeacherAvailabilityRule } from '@pris
 import { PrismaService } from '../../prisma/prisma.service';
 import { TUTORING_CAPACITY } from '../../common/tutoring.constants';
 import { splitIntoBlocks } from '../../common/time.util';
+import { slotKeyOf } from '../teachers/assignment-scope';
 
 const JS_DAY_TO_ENUM: DayOfWeek[] = [
   DayOfWeek.SUNDAY,
@@ -26,6 +27,7 @@ type RuleWithAssignment = TeacherAvailabilityRule & {
     levelId: string;
     academicPeriodId: string;
     academicPeriod: { startDate: Date; endDate: Date };
+    level: { id: string; grade: number | null; educationLevel: string | null };
   };
 };
 
@@ -34,8 +36,8 @@ type RuleWithAssignment = TeacherAvailabilityRule & {
  * materia+nivel concreta) en TutoringSession concretas de 40 minutos en estado AVAILABLE,
  * ya con materia y nivel puestos — el DECE ya no los elige al agendar. Nunca toca sesiones
  * ya SCHEDULED/COMPLETED/etc. — createMany + skipDuplicates se apoya en
- * @@unique([teacherId, date, startTime]) del schema para que reejecutar el generador sea
- * idempotente.
+ * @@unique([teacherId, date, startTime, slotKey]) del schema para que reejecutar el generador sea
+ * idempotente (y para que las especialidades hermanas compartan un solo bloque).
  */
 @Injectable()
 export class AvailabilityGeneratorService {
@@ -55,7 +57,7 @@ export class AvailabilityGeneratorService {
         isActive: true,
         teacherAssignment: { isActive: true, academicPeriod: { isActive: true } },
       },
-      include: { teacherAssignment: { include: { academicPeriod: true } } },
+      include: { teacherAssignment: { include: { academicPeriod: true, level: true } } },
     });
 
     let created = 0;
@@ -70,6 +72,7 @@ export class AvailabilityGeneratorService {
     if (dates.length === 0) return 0;
 
     const blocks = splitIntoBlocks(rule.startTime, rule.endTime);
+    const slotKey = slotKeyOf(rule.teacherAssignment.subjectId, rule.teacherAssignment.level);
     const rows: Prisma.TutoringSessionCreateManyInput[] = [];
     for (const date of dates) {
       for (const block of blocks) {
@@ -83,6 +86,7 @@ export class AvailabilityGeneratorService {
           date,
           startTime: block.startTime,
           endTime: block.endTime,
+          slotKey,
           status: SessionStatus.AVAILABLE,
           capacity: TUTORING_CAPACITY,
           location: rule.location, // el lugar lo declaró el docente en su horario

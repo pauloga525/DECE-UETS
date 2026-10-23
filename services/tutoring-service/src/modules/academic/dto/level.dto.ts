@@ -1,4 +1,5 @@
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsId } from '../../../common/is-id.validator';
 
 export class CreateLevelDto {
   @IsString()
@@ -8,7 +9,7 @@ export class CreateLevelDto {
   @IsInt()
   order!: number;
 
-  @IsUUID()
+  @IsId()
   academicPeriodId!: string;
 }
 

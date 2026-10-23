@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/EmptyState';
+import { TrashIcon } from '@/components/ui/icons';
 
 import { Pagination, usePagination } from '@/components/ui/Pagination';
 type MyTeacher = Teacher & {
@@ -103,6 +104,21 @@ export default function MySchedulePage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo actualizar');
+    }
+  }
+
+  // Pedido 2026-10-23: además de desactivarlo, el docente puede eliminar un horario.
+  async function remove(rule: AvailabilityRule & { assignment: TeacherAssignment }) {
+    const label = `${rule.assignment.subject?.name} · ${DAY_OF_WEEK_LABEL[rule.dayOfWeek]} ${rule.startTime}–${rule.endTime}`;
+    if (!window.confirm(`¿Eliminar el horario ${label}? Se borran sus bloques libres. Esta acción no se puede deshacer.`)) return;
+    setError(null);
+    setSaved(null);
+    try {
+      await api.delete(`/availability/rules/${rule.id}`);
+      setSaved('Horario eliminado.');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar el horario');
     }
   }
 
@@ -225,9 +241,19 @@ export default function MySchedulePage() {
                     </span>
                   )}
                 </span>
-                <button onClick={() => toggle(r)} title="Activar / desactivar">
-                  <Badge tone={r.isActive ? 'accent' : 'neutral'}>{r.isActive ? 'Activo' : 'Inactivo'}</Badge>
-                </button>
+                <span className="flex items-center gap-3">
+                  <button onClick={() => toggle(r)} title="Activar / desactivar">
+                    <Badge tone={r.isActive ? 'accent' : 'neutral'}>{r.isActive ? 'Activo' : 'Inactivo'}</Badge>
+                  </button>
+                  <button
+                    onClick={() => remove(r)}
+                    title="Eliminar horario"
+                    aria-label="Eliminar horario"
+                    className="text-status-danger hover:opacity-70"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

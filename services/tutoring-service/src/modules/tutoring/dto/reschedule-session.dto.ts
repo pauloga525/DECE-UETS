@@ -1,7 +1,7 @@
-import { IsUUID } from 'class-validator';
+import { IsId } from '../../../common/is-id.validator';
 
 export class RescheduleSessionDto {
   /** id de un TutoringSession en estado AVAILABLE que recibirá la tutoría. */
-  @IsUUID()
+  @IsId()
   newSessionId!: string;
 }

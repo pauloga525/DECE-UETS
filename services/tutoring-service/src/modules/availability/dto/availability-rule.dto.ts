@@ -1,6 +1,7 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DayOfWeek } from '@prisma/client';
+import { IsId } from '../../../common/is-id.validator';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -9,7 +10,7 @@ export class CreateAvailabilityRuleDto {
   // (ver comentario en TeacherAvailabilityRule, schema.prisma) — de ahí sale también el
   // docente y el período, sin necesidad de repetirlos aquí.
   @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @IsId()
   teacherAssignmentId!: string;
 
   @ApiProperty({ enum: DayOfWeek })

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -52,6 +52,16 @@ export class AvailabilityController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.rules.update(id, dto, user);
+  }
+
+  @Roles(...WRITE_ROLES)
+  @Delete('rules/:id')
+  @ApiOperation({
+    summary: 'Eliminar un horario de tutoría (Admin/Docente)',
+    description: 'Borra sus bloques libres desde hoy. 409 si tiene tutorías agendadas a futuro.',
+  })
+  removeRule(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.rules.remove(id, user);
   }
 
   @Roles(...READ_ROLES)

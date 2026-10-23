@@ -1,11 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsId } from '../../../common/is-id.validator';
 
 export class AuditLogFiltersDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Filtrar por quién ejecutó la acción' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   userId?: string;
 
   @ApiPropertyOptional({

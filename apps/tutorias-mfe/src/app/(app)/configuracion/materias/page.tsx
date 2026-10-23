@@ -41,10 +41,20 @@ export default function SubjectsPage() {
     load();
   }
 
+  async function toggleTechnical(subject: Subject) {
+    await api.patch(`/academic/subjects/${subject.id}`, { isTechnical: !subject.isTechnical });
+    load();
+  }
+
   const pg = usePagination(subjects ?? []);
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-2xl">Materias</h1>
+      <h1 className="mb-1 text-2xl">Materias</h1>
+      <p className="mb-6 text-sm text-ink-soft">
+        Las materias <strong>técnicas</strong> (módulos de especialidad) pueden tener horarios de tutoría
+        que se cruzan entre sí: el docente atiende a la vez varias materias técnicas de distintos niveles y
+        especialidades. Las del tronco común (Matemáticas, Lengua, Inglés…) no.
+      </p>
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-end gap-3 p-5">
@@ -67,9 +77,14 @@ export default function SubjectsPage() {
                 <span>
                   {s.name} <span className="font-mono text-ink-soft">· {s.code}</span>
                 </span>
-                <button onClick={() => toggleActive(s)}>
-                  <Badge tone={s.isActive ? 'accent' : 'neutral'}>{s.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                </button>
+                <span className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => toggleTechnical(s)} title="Marcar / desmarcar como materia técnica">
+                    <Badge tone={s.isTechnical ? 'waitlist' : 'neutral'}>{s.isTechnical ? 'Técnica' : 'Tronco común'}</Badge>
+                  </button>
+                  <button onClick={() => toggleActive(s)}>
+                    <Badge tone={s.isActive ? 'accent' : 'neutral'}>{s.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

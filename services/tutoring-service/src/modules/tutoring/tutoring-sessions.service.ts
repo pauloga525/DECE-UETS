@@ -11,7 +11,7 @@ import { recordSessionEvent } from '../events/domain-events';
 import { AttendanceService } from './attendance.service';
 import { AuthenticatedUser } from '../auth/authenticated-user';
 import { assertActsOnOwnTeacher } from '../teachers/teacher-of-user';
-import { minutesToTime, sessionInstant, START_EARLY_MINUTES, timeToMinutes } from '../../common/time.util';
+import { minutesToTime, sessionInstant, START_EARLY_MINUTES, timeRangesOverlap, timeToMinutes } from '../../common/time.util';
 import { ScheduleSessionDto, StudentEnrollmentInput } from './dto/schedule-session.dto';
 import {
   ACTIVE_ENROLLMENT_STATUSES,
@@ -309,9 +309,16 @@ export class TutoringSessionsService {
       // Serializa los inicios de un mismo docente: dos "Iniciar" simultáneos sobre bloques
       // distintos toman locks de filas distintas, así que el FOR UPDATE de arriba no basta.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${session.teacherId}))`;
-      const active = await tx.tutoringSession.findFirst({
+      // Excepción: bloques simultáneos (materias técnicas, pedido 2026-10-23) — el docente los
+      // atiende a la vez, así que puede iniciarlos todos.
+      const actives = await tx.tutoringSession.findMany({
         where: { teacherId: session.teacherId, status: SessionStatus.IN_PROGRESS, id: { not: sessionId } },
       });
+      const active = actives.find(
+        (a) =>
+          a.date.getTime() !== session.date.getTime() ||
+          !timeRangesOverlap(a.startTime, a.endTime, session.startTime, session.endTime),
+      );
       if (active) {
         throw new ConflictException(
           `Tienes otra tutoría en curso (${active.startTime}–${active.endTime}). Finalízala antes de iniciar una nueva.`,

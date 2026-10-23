@@ -1,31 +1,32 @@
-import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsIn, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsId } from '../../../common/is-id.validator';
 
 // Filtros comunes a los endpoints de reportes (pantalla 23): período, docente, materia, nivel, rango de fechas.
 export class ReportFiltersDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   academicPeriodId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   teacherId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   subjectId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   levelId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Curso (paralelo). Para el animador se fuerza a su curso.' })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   parallelId?: string;
 
   @ApiPropertyOptional({ example: '2026-09-01' })

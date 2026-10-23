@@ -3,13 +3,13 @@ import {
   IsArray,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AttendanceRecordInput } from './record-attendance.dto';
+import { IsId } from '../../../common/is-id.validator';
 
 /** Informe de cierre de la tutoría (pedido 7/9/2026). */
 export class TutoringReportInput {
@@ -53,7 +53,7 @@ export class CloseSessionDto {
   @ApiPropertyOptional({ type: [String], description: 'Inscripciones presentes; las demás quedan ausentes' })
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsId({ each: true })
   presentEnrollmentIds?: string[];
 
   @ApiPropertyOptional({ type: () => AttendanceRecordInput, isArray: true })
@@ -73,6 +73,6 @@ export class StartSessionDto {
   @ApiPropertyOptional({ type: [String], description: 'Inscripciones presentes al iniciar; las demás quedan ausentes' })
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsId({ each: true })
   presentEnrollmentIds?: string[];
 }

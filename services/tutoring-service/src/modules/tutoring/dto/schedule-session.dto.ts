@@ -5,7 +5,6 @@ import {
   IsEnum,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -13,10 +12,11 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TUTORING_CAPACITY } from '../../../common/tutoring.constants';
 import { EnrollmentReason } from '@prisma/client';
+import { IsId } from '../../../common/is-id.validator';
 
 export class StudentEnrollmentInput {
   @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @IsId()
   studentId!: string;
 
   @ApiProperty({ enum: EnrollmentReason })
@@ -36,7 +36,7 @@ export class ScheduleSessionDto {
   // Obsoleto desde 2026-10-02: la tutoría puede mezclar paralelos del nivel; se ignora.
   @ApiPropertyOptional({ format: 'uuid', deprecated: true })
   @IsOptional()
-  @IsUUID()
+  @IsId()
   parallelId?: string;
 
   // Espacio físico de la tutoría. Por defecto se toma el lugar que el docente declaró en su

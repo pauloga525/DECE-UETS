@@ -4,18 +4,18 @@ import {
   IsEmail,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { IsId } from '../../../common/is-id.validator';
 
 export class CreateParallelDto {
   @IsString()
   @MinLength(1)
   name!: string;
 
-  @IsUUID()
+  @IsId()
   levelId!: string;
 }
 

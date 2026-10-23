@@ -8,6 +8,10 @@ export class CreateSubjectDto {
   @IsString()
   @MinLength(2)
   code!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isTechnical?: boolean;
 }
 
 export class UpdateSubjectDto {
@@ -19,4 +23,9 @@ export class UpdateSubjectDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Materia técnica: sus horarios de tutoría pueden cruzarse con otras técnicas. */
+  @IsOptional()
+  @IsBoolean()
+  isTechnical?: boolean;
 }

@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsId } from '../../../common/is-id.validator';
 
 export class CreateStudentDto {
   @IsString()
@@ -13,10 +14,10 @@ export class CreateStudentDto {
   @MinLength(5)
   identification!: string;
 
-  @IsUUID()
+  @IsId()
   levelId!: string;
 
-  @IsUUID()
+  @IsId()
   parallelId!: string;
 }
 
@@ -32,11 +33,11 @@ export class UpdateStudentDto {
   lastName?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   levelId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   parallelId?: string;
 
   @IsOptional()

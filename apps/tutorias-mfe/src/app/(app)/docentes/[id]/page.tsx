@@ -22,6 +22,7 @@ import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { EmptyState, Spinner } from '@/components/ui/EmptyState';
+import { PencilIcon, TrashIcon } from '@/components/ui/icons';
 
 import { Pagination, usePagination } from '@/components/ui/Pagination';
 const DAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -48,6 +49,8 @@ export default function TeacherProfilePage() {
   const [newLevelId, setNewLevelId] = useState('');
   // Paralelos donde dicta la materia; ninguno marcado = todo el nivel.
   const [newParallelIds, setNewParallelIds] = useState<string[]>([]);
+  // Edición de los paralelos de una asignación existente (pedido 2026-10-23).
+  const [editingAssignment, setEditingAssignment] = useState<{ id: string; parallelIds: string[] } | null>(null);
 
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [ruleAssignmentId, setRuleAssignmentId] = useState('');
@@ -115,6 +118,52 @@ export default function TeacherProfilePage() {
       loadAssignments();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'No se pudo crear la asignación');
+    }
+  }
+
+  async function saveAssignmentParallels() {
+    if (!editingAssignment) return;
+    setFormError(null);
+    try {
+      await api.patch(`/teachers/assignments/${editingAssignment.id}`, { parallelIds: editingAssignment.parallelIds });
+      setEditingAssignment(null);
+      loadAssignments();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'No se pudieron guardar los paralelos');
+    }
+  }
+
+  async function toggleAssignment(a: TeacherAssignment) {
+    setFormError(null);
+    try {
+      await api.patch(`/teachers/assignments/${a.id}`, { isActive: !a.isActive });
+      loadAssignments();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'No se pudo actualizar la asignación');
+    }
+  }
+
+  async function removeAssignment(a: TeacherAssignment) {
+    if (!window.confirm(`¿Quitar ${a.subject?.name} · ${a.level?.name} a este docente? Se borran también sus horarios de tutoría.`)) return;
+    setFormError(null);
+    try {
+      await api.delete(`/teachers/assignments/${a.id}`);
+      loadAssignments();
+      loadRules();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'No se pudo quitar la asignación');
+    }
+  }
+
+  async function removeRule(r: AvailabilityRule) {
+    if (!window.confirm(`¿Eliminar el horario ${DAY_OF_WEEK_LABEL[r.dayOfWeek]} ${r.startTime}–${r.endTime}? Se borran sus bloques libres.`)) return;
+    setFormError(null);
+    try {
+      await api.delete(`/availability/rules/${r.id}`);
+      loadRules();
+      loadDayBlocks();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'No se pudo eliminar el horario');
     }
   }
 
@@ -233,14 +282,85 @@ export default function TeacherProfilePage() {
           {assignments.length > 0 && (
             <Card>
               <ul className="divide-y divide-line">
-                {pgAssignments.pageItems.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <span>
-                      {a.subject?.name} · {a.level?.name}{parallelsSuffix(a)}
-                    </span>
-                    <Badge tone={a.isActive ? 'accent' : 'neutral'}>{a.isActive ? 'Vigente' : 'Inactiva'}</Badge>
-                  </li>
-                ))}
+                {pgAssignments.pageItems.map((a) => {
+                  const levelParallels = [...(levels.find((l) => l.id === a.levelId)?.parallels ?? [])].sort((x, y) =>
+                    x.name.localeCompare(y.name, 'es', { numeric: true }),
+                  );
+                  const editing = editingAssignment?.id === a.id ? editingAssignment : null;
+                  const status = <Badge tone={a.isActive ? 'accent' : 'neutral'}>{a.isActive ? 'Vigente' : 'Inactiva'}</Badge>;
+                  return (
+                    <li key={a.id} className="px-4 py-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>
+                          {a.subject?.name} · {a.level?.name}
+                          {parallelsSuffix(a)}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-3">
+                          {isAdmin ? (
+                            <button onClick={() => toggleAssignment(a)} title="Activar / desactivar">
+                              {status}
+                            </button>
+                          ) : (
+                            status
+                          )}
+                          {isAdmin && levelParallels.length > 0 && (
+                            <button
+                              onClick={() =>
+                                setEditingAssignment(
+                                  editing ? null : { id: a.id, parallelIds: (a.parallels ?? []).map((p) => p.parallelId) },
+                                )
+                              }
+                              title="Editar paralelos"
+                              aria-label="Editar paralelos"
+                              className="text-accent-ink hover:opacity-70"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={() => removeAssignment(a)}
+                              title="Quitar materia"
+                              aria-label="Quitar materia"
+                              className="text-status-danger hover:opacity-70"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      {editing && (
+                        <div className="mt-2 rounded-md bg-paper px-3 py-2">
+                          <p className="text-xs text-ink-soft">Paralelos donde dicta la materia (ninguno = todo el nivel)</p>
+                          <div className="flex flex-wrap items-center gap-3 py-2">
+                            {levelParallels.map((p) => (
+                              <label key={p.id} className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-[#1f6f5c]"
+                                  checked={editing.parallelIds.includes(p.id)}
+                                  onChange={(e) =>
+                                    setEditingAssignment({
+                                      id: a.id,
+                                      parallelIds: e.target.checked
+                                        ? [...editing.parallelIds, p.id]
+                                        : editing.parallelIds.filter((x) => x !== p.id),
+                                    })
+                                  }
+                                />
+                                {p.name}
+                              </label>
+                            ))}
+                            <Button onClick={saveAssignmentParallels}>Guardar</Button>
+                            <Button variant="secondary" onClick={() => setEditingAssignment(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           )}
@@ -316,7 +436,19 @@ export default function TeacherProfilePage() {
                         {r.location ? ` · ${r.location}` : ' · sin lugar'}
                       </span>
                     </span>
-                    <Badge tone={r.isActive ? 'accent' : 'neutral'}>{r.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <Badge tone={r.isActive ? 'accent' : 'neutral'}>{r.isActive ? 'Activa' : 'Inactiva'}</Badge>
+                      {canManage && (
+                        <button
+                          onClick={() => removeRule(r)}
+                          title="Eliminar horario"
+                          aria-label="Eliminar horario"
+                          className="text-status-danger hover:opacity-70"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

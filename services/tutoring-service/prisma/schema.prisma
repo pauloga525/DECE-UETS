@@ -127,6 +127,10 @@ model Subject {
   name      String
   code      String   @unique
   isActive  Boolean  @default(true)
+  // Materia técnica (módulos de especialidad, fuera del tronco común). Pedido 2026-10-23: el
+  // docente de materias técnicas atiende a la vez varias materias/niveles/especialidades, así que
+  // sus horarios de tutoría de materias técnicas pueden cruzarse entre sí.
+  isTechnical Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -352,7 +356,12 @@ model TutoringSession {
 
   // Regla 6, sección 4: sin solape de docente. Consultado junto a date+startTime en el servicio de agenda
   // bajo SELECT ... FOR UPDATE (sección 7) — la unicidad exacta se valida en transacción, no solo aquí.
-  @@unique([teacherId, date, startTime])
+  // Clave del bloque dentro del docente: materia + curso (sin especialidad), ver slotKeyOf().
+  // Las especialidades hermanas comparten bloque; materias técnicas distintas a la misma hora
+  // tienen bloques propios (pedido 2026-10-23). Que dos horarios no técnicos no se crucen lo
+  // valida AvailabilityRulesService al declarar el horario.
+  slotKey             String        @default("")
+  @@unique([teacherId, date, startTime, slotKey])
   @@index([date, status])
   @@map("tutoring_sessions")
 }

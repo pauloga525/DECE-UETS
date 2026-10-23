@@ -124,6 +124,8 @@ export interface Subject {
   name: string;
   code: string;
   isActive: boolean;
+  /** Materia técnica: sus horarios de tutoría pueden cruzarse con otras técnicas. */
+  isTechnical?: boolean;
 }
 
 export interface Teacher {
