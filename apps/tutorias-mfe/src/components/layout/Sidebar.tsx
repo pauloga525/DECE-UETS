@@ -39,7 +39,7 @@ const NAV: NavGroup[] = [
     items: [
       { label: 'Agenda', href: '/agenda', roles: STAFF },
       // El docente crea tutorías solo para sí mismo (validado en el backend) — pedido 7/9/2026.
-      { label: 'Crear tutoría', href: '/crear', roles: STAFF },
+      { label: 'Crear tutoría', href: '/crear', roles: DECE }, // solo el DECE crea tutorías (2026-10-28)
       { label: 'Mi horario', href: '/mi-horario', roles: ['TEACHER'] },
       { label: 'Mis alumnos', href: '/mis-alumnos', roles: ['TEACHER'] },
       { label: 'Programadas', href: '/agenda?status=SCHEDULED', roles: STAFF },

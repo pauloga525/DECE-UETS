@@ -28,6 +28,8 @@ import {
 // de otros docentes (ni el suyo propio por esta vía) — pedido explícito, no solo ocultar la UI.
 const READ_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST];
 const WRITE_ROLES = [UserRole.ADMIN];
+// Editar (paralelos, activar/desactivar) y quitar materias de un docente: Admin y DECE (pedido 2026-10-27).
+const ASSIGNMENT_EDIT_ROLES = READ_ROLES;
 
 @ApiTags('teachers')
 @ApiBearerAuth()
@@ -168,17 +170,17 @@ export class TeachersController {
     return this.assignments.findAll({ teacherId, academicPeriodId });
   }
 
-  @Roles(...WRITE_ROLES)
+  @Roles(...ASSIGNMENT_EDIT_ROLES)
   @Patch('assignments/:id')
-  @ApiOperation({ summary: 'Activar/desactivar una asignación o cambiar sus paralelos (Admin)' })
+  @ApiOperation({ summary: 'Activar/desactivar una asignación o cambiar sus paralelos (Admin/DECE)' })
   updateAssignment(@Param('id') id: string, @Body() dto: UpdateTeacherAssignmentDto) {
     return this.assignments.update(id, dto);
   }
 
-  @Roles(...WRITE_ROLES)
+  @Roles(...ASSIGNMENT_EDIT_ROLES)
   @Delete('assignments/:id')
   @ApiOperation({
-    summary: 'Quitar una materia a un docente (Admin)',
+    summary: 'Quitar una materia a un docente (Admin/DECE)',
     description: 'Solo si no tiene tutorías con historial — si tiene, 409 (desactivarla en su lugar).',
   })
   removeAssignment(@Param('id') id: string) {

@@ -22,7 +22,9 @@ const COLORS: Record<SessionStatus, { bg: string; border: string; text: string }
   CANCELLED: { bg: '#f8e9e9', border: '#a83f3f', text: '#a83f3f' },
 };
 
-function toEvent(s: TutoringSession): EventInput {
+// Un bloque libre abre "Crear tutoría" solo para el DECE; el docente no crea tutorías
+// (pedido 2026-10-28) y ve el detalle del bloque.
+function toEvent(s: TutoringSession, canCreate: boolean): EventInput {
   const day = s.date.slice(0, 10);
   const c = COLORS[s.status];
   const count = s.enrollments?.filter((e) => e.status !== 'CANCELLED').length ?? 0;
@@ -41,7 +43,7 @@ function toEvent(s: TutoringSession): EventInput {
       teacher: s.teacher ? fullName(s.teacher) : '',
       location: s.location,
       seats: `${count}/${s.capacity}`,
-      href: s.status === 'AVAILABLE' ? `/crear?sessionId=${s.id}` : `/sesiones/${s.id}`,
+      href: s.status === 'AVAILABLE' && canCreate ? `/crear?sessionId=${s.id}` : `/sesiones/${s.id}`,
     },
   };
 }
@@ -72,7 +74,15 @@ function EventBlock({ event, view }: EventContentArg) {
  * Agenda con diseño tipo Google Calendar (pedido 7/9/2026): vistas mes / semana / día /
  * lista, colores por estado, clic en un bloque para abrirlo.
  */
-export function TutoringCalendar({ teacherId, status }: { teacherId?: string; status?: SessionStatus | '' }) {
+export function TutoringCalendar({
+  teacherId,
+  status,
+  canCreate = true,
+}: {
+  teacherId?: string;
+  status?: SessionStatus | '';
+  canCreate?: boolean;
+}) {
   const router = useRouter();
   const ref = useRef<FullCalendar>(null);
 
@@ -82,9 +92,9 @@ export function TutoringCalendar({ teacherId, status }: { teacherId?: string; st
       if (teacherId) params.set('teacherId', teacherId);
       if (status) params.set('status', status);
       const sessions = await api.get<TutoringSession[]>(`/tutoring/sessions?${params.toString()}`);
-      return sessions.map(toEvent);
+      return sessions.map((s) => toEvent(s, canCreate));
     },
-    [teacherId, status],
+    [teacherId, status, canCreate],
   );
 
   return (

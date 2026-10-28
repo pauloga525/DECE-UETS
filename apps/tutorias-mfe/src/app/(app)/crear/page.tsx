@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import { useRequireAuth } from '@/lib/auth';
 import type { Student, Teacher, TutoringSession } from '@/lib/types';
 import { ENROLLMENT_REASON_LABEL, EnrollmentReason } from '@/lib/types';
 import { fullName, todayInputValue } from '@/lib/format';
@@ -30,9 +30,9 @@ interface DraftStudent {
 
 export default function CrearTutoriaPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  // El docente solo crea tutorías para sí mismo (pedido 7/9/2026): el paso "Docente" queda
-  // fijo con su propia ficha. El backend lo valida igual.
+  // Solo el DECE crea tutorías (pedido 2026-10-28): un docente que entre por URL vuelve al inicio.
+  const { user } = useRequireAuth(['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST']);
+  // Restos del flujo anterior (7/9/2026), cuando el docente creaba tutorías en sus bloques.
   const isTeacher = user?.role === 'TEACHER';
   const searchParams = useSearchParams();
   const preselectedSessionId = searchParams.get('sessionId');

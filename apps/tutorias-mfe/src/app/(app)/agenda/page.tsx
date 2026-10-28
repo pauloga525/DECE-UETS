@@ -108,9 +108,12 @@ export default function AgendaPage() {
               </button>
             ))}
           </div>
-          <Link href="/crear">
-            <Button>Crear tutoría</Button>
-          </Link>
+          {/* Solo el DECE crea tutorías (pedido 2026-10-28). */}
+          {!isTeacher && (
+            <Link href="/crear">
+              <Button>Crear tutoría</Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -148,7 +151,7 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {view === 'calendar' && <TutoringCalendar teacherId={teacherId} status={statusParam} />}
+      {view === 'calendar' && <TutoringCalendar teacherId={teacherId} status={statusParam} canCreate={!isTeacher} />}
 
       {view === 'list' && error && <ErrorState title="No se pudo cargar la agenda" onRetry={load} />}
       {view === 'list' && !error && !sessions && <Spinner />}
@@ -173,7 +176,7 @@ export default function AgendaPage() {
                 <tbody className="divide-y divide-line">
                   {pageItems.map((s) => {
                     const href =
-                      s.status === 'AVAILABLE' ? `/crear?sessionId=${s.id}` : `/sesiones/${s.id}`;
+                      s.status === 'AVAILABLE' && !isTeacher ? `/crear?sessionId=${s.id}` : `/sesiones/${s.id}`;
                     return (
                       <tr key={s.id} className="hover:bg-paper">
                         <td className="px-4 py-2">

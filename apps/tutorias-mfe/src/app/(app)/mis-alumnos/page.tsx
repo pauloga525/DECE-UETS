@@ -78,7 +78,7 @@ export default function MyStudentsPage() {
     <div>
       <h1 className="mb-1 text-2xl">Mis alumnos</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        Alumnos de los paralelos donde dictas cada materia, con sus tutorías contigo. Puedes crear tutorías para ellos desde
+        Alumnos de los paralelos donde dictas cada materia, con sus tutorías contigo. Las tutorías las crea el DECE desde
         &ldquo;Crear tutoría&rdquo;.
       </p>
 

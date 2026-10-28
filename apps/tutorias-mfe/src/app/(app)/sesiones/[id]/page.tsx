@@ -107,7 +107,8 @@ export default function TutoringDetailPage() {
   // CU-06 (backend CANCEL_ROLES): DECE y docente pueden cancelar, no solo DECE/Admin.
   const canCancel = user && ['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST', 'TEACHER'].includes(user.role);
   // El docente puede sumar estudiantes a SUS tutorías (el backend valida que sea suya).
-  const canEnroll = canManage || user?.role === 'TEACHER';
+  // Sumar estudiantes es parte de crear la tutoría: solo el DECE (pedido 2026-10-28).
+  const canEnroll = canManage;
   const reportPending = session.status === 'COMPLETED' && !session.report;
 
   return (

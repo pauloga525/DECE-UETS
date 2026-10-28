@@ -10,6 +10,8 @@ import { CreateAvailabilityRuleDto, UpdateAvailabilityRuleDto } from './dto/avai
 
 const READ_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST, UserRole.TEACHER];
 const WRITE_ROLES = [UserRole.ADMIN, UserRole.TEACHER];
+// Eliminar un horario: el docente (solo los suyos), el Admin y el DECE (pedido 2026-10-27).
+const DELETE_ROLES = READ_ROLES;
 
 @ApiTags('availability')
 @ApiBearerAuth()
@@ -54,10 +56,10 @@ export class AvailabilityController {
     return this.rules.update(id, dto, user);
   }
 
-  @Roles(...WRITE_ROLES)
+  @Roles(...DELETE_ROLES)
   @Delete('rules/:id')
   @ApiOperation({
-    summary: 'Eliminar un horario de tutoría (Admin/Docente)',
+    summary: 'Eliminar un horario de tutoría (Admin/DECE/Docente)',
     description: 'Borra sus bloques libres desde hoy. 409 si tiene tutorías agendadas a futuro.',
   })
   removeRule(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Pagination, usePagination } from '@/components/ui/Pagination';
 export default function DashboardPage() {
   const { user } = useAuth();
-  const canCreate = user && ['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST', 'TEACHER'].includes(user.role);
+  const canCreate = user && ['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST'].includes(user.role); // solo el DECE crea tutorías
   const [sessions, setSessions] = useState<TutoringSession[] | null>(null);
   const [error, setError] = useState(false);
 

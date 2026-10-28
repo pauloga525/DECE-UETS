@@ -37,6 +37,9 @@ export default function TeacherProfilePage() {
   // ADMIN/TEACHER, y como un TEACHER ya no entra aquí, habilitarlo para DECE solo produciría
   // un botón que siempre falla con 403.
   const canManage = isAdmin;
+  // Editar/quitar materias y eliminar horarios: Admin y DECE (pedido 2026-10-27). Agregar
+  // materias y declarar horarios sigue siendo solo del Admin.
+  const canEdit = !!user && ['ADMIN', 'PSYCHOLOGY_COORDINATOR', 'PSYCHOLOGIST'].includes(user.role);
 
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [tab, setTab] = useState<'asignaciones' | 'disponibilidad'>('asignaciones');
@@ -296,14 +299,14 @@ export default function TeacherProfilePage() {
                           {parallelsSuffix(a)}
                         </span>
                         <span className="flex shrink-0 items-center gap-3">
-                          {isAdmin ? (
+                          {canEdit ? (
                             <button onClick={() => toggleAssignment(a)} title="Activar / desactivar">
                               {status}
                             </button>
                           ) : (
                             status
                           )}
-                          {isAdmin && levelParallels.length > 0 && (
+                          {canEdit && levelParallels.length > 0 && (
                             <button
                               onClick={() =>
                                 setEditingAssignment(
@@ -317,7 +320,7 @@ export default function TeacherProfilePage() {
                               <PencilIcon className="h-4 w-4" />
                             </button>
                           )}
-                          {isAdmin && (
+                          {canEdit && (
                             <button
                               onClick={() => removeAssignment(a)}
                               title="Quitar materia"
@@ -438,7 +441,7 @@ export default function TeacherProfilePage() {
                     </span>
                     <span className="flex shrink-0 items-center gap-3">
                       <Badge tone={r.isActive ? 'accent' : 'neutral'}>{r.isActive ? 'Activa' : 'Inactiva'}</Badge>
-                      {canManage && (
+                      {canEdit && (
                         <button
                           onClick={() => removeRule(r)}
                           title="Eliminar horario"

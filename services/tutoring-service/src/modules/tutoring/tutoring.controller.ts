@@ -18,9 +18,9 @@ import { findTeacherOfUser } from '../teachers/teacher-of-user';
 
 const READ_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST, UserRole.TEACHER];
 const PSYCHOLOGY_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST];
-// Agendar/sumar estudiantes: el DECE para cualquier docente; el docente solo en sus propios
-// bloques (validado en el servicio con assertActsOnOwnTeacher) — pedido 7/9/2026.
-const SCHEDULE_ROLES = [...PSYCHOLOGY_ROLES, UserRole.TEACHER];
+// Agendar (crear) una tutoría y sumarle estudiantes: solo el DECE (pedido 2026-10-28). Antes,
+// desde 7/9/2026, el docente también podía hacerlo en sus propios bloques.
+const SCHEDULE_ROLES = PSYCHOLOGY_ROLES;
 const TEACHER_ROLES = [UserRole.ADMIN, UserRole.TEACHER];
 const CANCEL_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST, UserRole.TEACHER];
 
