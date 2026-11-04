@@ -28,7 +28,8 @@ import {
 // de otros docentes (ni el suyo propio por esta vía) — pedido explícito, no solo ocultar la UI.
 const READ_ROLES = [UserRole.ADMIN, UserRole.PSYCHOLOGY_COORDINATOR, UserRole.PSYCHOLOGIST];
 const WRITE_ROLES = [UserRole.ADMIN];
-// Editar (paralelos, activar/desactivar) y quitar materias de un docente: Admin y DECE (pedido 2026-10-27).
+// Crear, editar (docente, materia, curso, paralelos, activar/desactivar) y quitar asignaciones:
+// Admin y DECE (pedidos 2026-10-27 y 2026-11-04).
 const ASSIGNMENT_EDIT_ROLES = READ_ROLES;
 
 @ApiTags('teachers')
@@ -150,10 +151,10 @@ export class TeachersController {
   }
 
   // ── Asignaciones docente-materia-nivel ──────────────────────────────
-  @Roles(...WRITE_ROLES)
+  @Roles(...ASSIGNMENT_EDIT_ROLES)
   @Post('assignments')
   @ApiOperation({
-    summary: 'Asignar a un docente una materia+nivel para un período (Admin)',
+    summary: 'Asignar a un docente una materia+nivel para un período (Admin/DECE)',
     description: 'Regla 5: única combinación docente+materia+nivel+período — 409 si ya existe.',
   })
   createAssignment(@Body() dto: CreateTeacherAssignmentDto) {
@@ -172,7 +173,7 @@ export class TeachersController {
 
   @Roles(...ASSIGNMENT_EDIT_ROLES)
   @Patch('assignments/:id')
-  @ApiOperation({ summary: 'Activar/desactivar una asignación o cambiar sus paralelos (Admin/DECE)' })
+  @ApiOperation({ summary: 'Editar una asignación: paralelos, estado, o reasignar docente/materia/curso (Admin/DECE)' })
   updateAssignment(@Param('id') id: string, @Body() dto: UpdateTeacherAssignmentDto) {
     return this.assignments.update(id, dto);
   }

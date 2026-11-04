@@ -26,6 +26,22 @@ export class UpdateTeacherAssignmentDto {
   @IsBoolean()
   isActive?: boolean;
 
+  /**
+   * Reasignar a otro docente, materia o curso (pedido 2026-11-04). Solo si la asignación no
+   * tiene tutorías con historial; sus horarios y bloques libres se borran.
+   */
+  @IsOptional()
+  @IsId()
+  teacherId?: string;
+
+  @IsOptional()
+  @IsId()
+  subjectId?: string;
+
+  @IsOptional()
+  @IsId()
+  levelId?: string;
+
   /** Reemplaza los paralelos de la asignación. Vacío = todo el nivel. */
   @IsOptional()
   @IsArray()

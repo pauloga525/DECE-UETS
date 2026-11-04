@@ -57,20 +57,76 @@ export class TeacherAssignmentsService {
   async update(id: string, dto: UpdateTeacherAssignmentDto) {
     const existing = await this.prisma.teacherAssignment.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Asignación no encontrada');
-    const { parallelIds, ...data } = dto;
-    if (parallelIds) await this.assertParallelsOfLevel(existing.levelId, parallelIds);
+    const { parallelIds, teacherId, subjectId, levelId, ...data } = dto;
+
+    // Reasignar docente, materia o curso (pedido 2026-11-04): es otra asignación con el mismo id.
+    // Solo sin historial de tutorías; los horarios y bloques libres eran del docente/materia/curso
+    // anterior, así que se borran.
+    const target = {
+      teacherId: teacherId ?? existing.teacherId,
+      subjectId: subjectId ?? existing.subjectId,
+      levelId: levelId ?? existing.levelId,
+    };
+    const reassigns =
+      target.teacherId !== existing.teacherId ||
+      target.subjectId !== existing.subjectId ||
+      target.levelId !== existing.levelId;
+    if (reassigns) {
+      const used = await this.countHistory(id);
+      if (used > 0) {
+        throw new ConflictException(
+          `Esta asignación ya tiene ${used} tutoría(s) registrada(s): no se puede cambiar de docente, materia o curso sin perder el historial. Quítale los paralelos o desactívala y crea una asignación nueva.`,
+        );
+      }
+    }
+    // Al cambiar de curso los paralelos anteriores ya no sirven: hay que indicar los nuevos.
+    const finalParallels = parallelIds ?? (target.levelId !== existing.levelId ? [] : undefined);
+    if (finalParallels) await this.assertParallelsOfLevel(target.levelId, finalParallels);
 
     // Pendiente #4 (sección 14): por ahora se permite desactivar con advertencia;
     // no se bloquea aunque existan tutorías futuras dependientes.
-    return this.prisma.teacherAssignment.update({
-      where: { id },
-      data: {
-        ...data,
-        ...(parallelIds && {
-          parallels: { deleteMany: {}, create: [...new Set(parallelIds)].map((parallelId) => ({ parallelId })) },
-        }),
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (reassigns) {
+          await tx.tutoringSession.deleteMany({ where: { teacherAssignmentId: id } });
+          await tx.teacherAvailabilityRule.deleteMany({ where: { teacherAssignmentId: id } });
+        }
+        return tx.teacherAssignment.update({
+          where: { id },
+          data: {
+            ...data,
+            ...(reassigns && target),
+            ...(finalParallels && {
+              parallels: {
+                deleteMany: {},
+                create: [...new Set(finalParallels)].map((parallelId) => ({ parallelId })),
+              },
+            }),
+          },
+          include: ASSIGNMENT_INCLUDE,
+        });
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException(
+          'Ese docente ya tiene esa materia en ese curso para el período: edita esa asignación y agrégale los paralelos.',
+        );
+      }
+      throw e;
+    }
+  }
+
+  /** Tutorías con historial (agendadas, dictadas, canceladas, con alumnos o con informe). */
+  private countHistory(assignmentId: string) {
+    return this.prisma.tutoringSession.count({
+      where: {
+        teacherAssignmentId: assignmentId,
+        OR: [
+          { status: { not: SessionStatus.AVAILABLE } },
+          { enrollments: { some: {} } },
+          { report: { isNot: null } },
+        ],
       },
-      include: ASSIGNMENT_INCLUDE,
     });
   }
 
@@ -82,16 +138,7 @@ export class TeacherAssignmentsService {
   async remove(id: string) {
     const existing = await this.prisma.teacherAssignment.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Asignación no encontrada');
-    const used = await this.prisma.tutoringSession.count({
-      where: {
-        teacherAssignmentId: id,
-        OR: [
-          { status: { not: SessionStatus.AVAILABLE } },
-          { enrollments: { some: {} } },
-          { report: { isNot: null } },
-        ],
-      },
-    });
+    const used = await this.countHistory(id);
     if (used > 0) {
       throw new ConflictException(
         `Esta materia ya tiene ${used} tutoría(s) registrada(s) y no se puede eliminar sin perder el historial. Desactívala en su lugar.`,
