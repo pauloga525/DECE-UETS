@@ -31,7 +31,15 @@ interface Data {
   students: number;
   withNote: number;
   automatic: number;
-  byStudent: { student: string; identification: string; course: string; absences: number; withNote: number }[];
+  byStudent: {
+    student: string;
+    identification: string;
+    course: string;
+    absences: number;
+    withNote: number;
+    /** A qué materias faltó y de qué docente (pedido 2026-11-25). */
+    subjects: { subject: string; teacher: string; absences: number }[];
+  }[];
 }
 
 const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -195,6 +203,7 @@ export function AbsencesReport({ query }: { query: string }) {
                       <tr className="border-b border-line">
                         <th className="px-4 py-2 text-left">Estudiante</th>
                         <th className="px-4 py-2 text-left">Curso</th>
+                        <th className="px-4 py-2 text-left">Materia · docente</th>
                         <th className="px-4 py-2 text-center">Inasistencias</th>
                         <th className="px-4 py-2 text-center">Con observación</th>
                       </tr>
@@ -207,6 +216,17 @@ export function AbsencesReport({ query }: { query: string }) {
                             <span className="block font-mono text-xs text-ink-soft">{s.identification}</span>
                           </td>
                           <td className="px-4 py-2">{s.course}</td>
+                          <td className="px-4 py-2">
+                            <ul className="flex flex-col gap-1">
+                              {s.subjects.map((x) => (
+                                <li key={`${x.subject}|${x.teacher}`}>
+                                  <span className="font-medium">{x.subject}</span>
+                                  {x.absences > 1 && <span className="ml-1 font-mono text-xs text-status-danger">×{x.absences}</span>}
+                                  <span className="block text-xs text-ink-soft">{x.teacher}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
                           <td className="px-4 py-2 text-center font-mono text-status-danger">{s.absences}</td>
                           <td className="px-4 py-2 text-center font-mono">{s.withNote}</td>
                         </tr>

@@ -92,6 +92,11 @@ const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m %
     `${rows.length}`);
   check('inasistencias: la observación del docente', rows.some((x) => x.note === 'Cita médica, avisó la representante') && rows.some((x) => x.note === 'Estaba en otra actividad del colegio'));
   check('el presente no aparece', !rows.some((x) => x.enrollmentId === e1.id));
+  const st = r.json.byStudent.find((x) => x.identification === students[1].identification);
+  check('por estudiante: materia y docente de la inasistencia',
+    st?.subjects.length >= 1 && st.subjects.every((x) => x.subject && x.teacher && x.absences >= 1) &&
+      st.subjects.reduce((n, x) => n + x.absences, 0) === st.absences,
+    JSON.stringify(st?.subjects));
   r = await call(admin, 'GET', '/tutorias/reports/absences');
   check('no incluye tutorías que no se realizaron', r.json.rows.every((x) => x.date));
   r = await call(admin, 'GET', '/tutorias/reports/absences.xlsx');

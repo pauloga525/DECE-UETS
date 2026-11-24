@@ -28,6 +28,9 @@ export interface AbsenceRow {
 }
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
+/** "MATEMÁTICAS — Juan Pérez (2)", una línea por materia. */
+const fmtSubjects = (subjects: { subject: string; teacher: string; absences: number }[]) =>
+  subjects.map((x) => `${x.subject} — ${x.teacher} (${x.absences})`).join('\n');
 
 /**
  * Inasistencias de estudiantes (pedido 2026-11-24): cada alumno que no asistió a una tutoría que
@@ -85,7 +88,18 @@ export class AbsencesReportService {
       };
     });
 
-    const studentMap = new Map<string, { student: string; identification: string; course: string; absences: number; withNote: number }>();
+    // Por estudiante, con el desglose por materia y docente (pedido 2026-11-25).
+    const studentMap = new Map<
+      string,
+      {
+        student: string;
+        identification: string;
+        course: string;
+        absences: number;
+        withNote: number;
+        subjects: { subject: string; teacher: string; absences: number }[];
+      }
+    >();
     for (const r of rows) {
       const s = studentMap.get(r.identification) ?? {
         student: r.student,
@@ -93,12 +107,18 @@ export class AbsencesReportService {
         course: `${r.level} · ${r.parallel}`,
         absences: 0,
         withNote: 0,
+        subjects: [],
       };
       s.absences++;
       if (r.note) s.withNote++;
+      const subj = s.subjects.find((x) => x.subject === r.subject && x.teacher === r.teacher);
+      if (subj) subj.absences++;
+      else s.subjects.push({ subject: r.subject, teacher: r.teacher, absences: 1 });
       studentMap.set(r.identification, s);
     }
-    const byStudent = [...studentMap.values()].sort((a, b) => b.absences - a.absences || a.student.localeCompare(b.student, 'es'));
+    const byStudent = [...studentMap.values()]
+      .map((s) => ({ ...s, subjects: s.subjects.sort((a, b) => b.absences - a.absences || a.subject.localeCompare(b.subject, 'es')) }))
+      .sort((a, b) => b.absences - a.absences || a.student.localeCompare(b.student, 'es'));
     return {
       rows,
       total: rows.length,
@@ -152,10 +172,13 @@ export class AbsencesReportService {
     s1.autoFilter = { from: 'A3', to: 'J3' };
 
     const s2 = wb.addWorksheet('Por estudiante', { views: [{ state: 'frozen', ySplit: 1 }] });
-    s2.addRow(['Estudiante', 'Cédula', 'Curso', 'Inasistencias', 'Con observación']);
+    s2.addRow(['Estudiante', 'Cédula', 'Curso', 'Materias (docente)', 'Inasistencias', 'Con observación']);
     head(s2, 1);
-    for (const s of data.byStudent) s2.addRow([s.student, s.identification, s.course, s.absences, s.withNote]).font = font;
-    s2.columns = [{ width: 38 }, { width: 13 }, { width: 46 }, { width: 14 }, { width: 16 }];
+    for (const s of data.byStudent) {
+      s2.addRow([s.student, s.identification, s.course, fmtSubjects(s.subjects), s.absences, s.withNote]).font = font;
+    }
+    s2.columns = [{ width: 38 }, { width: 13 }, { width: 46 }, { width: 70 }, { width: 14 }, { width: 16 }];
+    s2.getColumn(4).alignment = { wrapText: true, vertical: 'top' };
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
 
@@ -180,15 +203,16 @@ export class AbsencesReportService {
     pdf.section('Por estudiante');
     pdf.table(
       [
-        { title: 'Estudiante', w: 0.36 },
-        { title: 'Cédula', w: 0.12 },
-        { title: 'Curso', w: 0.32 },
-        { title: 'Inasistencias', w: 0.1, align: 'center' },
+        { title: 'Estudiante', w: 0.22 },
+        { title: 'Cédula', w: 0.09 },
+        { title: 'Curso', w: 0.2 },
+        { title: 'Materias (docente)', w: 0.31 },
+        { title: 'Faltas', w: 0.08, align: 'center' },
         { title: 'Con observación', w: 0.1, align: 'center' },
       ],
       data.byStudent.map((s) => ({
-        cells: [s.student, s.identification, s.course, String(s.absences), String(s.withNote)],
-        colors: [undefined, SOFT, undefined, RED],
+        cells: [s.student, s.identification, s.course, fmtSubjects(s.subjects), String(s.absences), String(s.withNote)],
+        colors: [undefined, SOFT, undefined, undefined, RED],
       })),
     );
     pdf.space(8);
