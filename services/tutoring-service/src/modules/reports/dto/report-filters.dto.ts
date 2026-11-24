@@ -46,4 +46,12 @@ export class ReportFiltersDto {
   @IsOptional()
   @IsIn(['scheduled', 'attended'])
   count?: 'scheduled' | 'attended';
+
+  @ApiPropertyOptional({
+    enum: ['NOT_HELD', 'NOT_CLOSED', 'CANCELLED'],
+    description: 'Tutorías no realizadas: solo un tipo (sin él, todos)',
+  })
+  @IsOptional()
+  @IsIn(['NOT_HELD', 'NOT_CLOSED', 'CANCELLED'])
+  kind?: 'NOT_HELD' | 'NOT_CLOSED' | 'CANCELLED';
 }

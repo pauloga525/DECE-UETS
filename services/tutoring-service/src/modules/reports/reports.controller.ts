@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { isAnimator, resolveAnimatorParallel } from '../animator/animator-scope';
 import { ReportsService } from './reports.service';
 import { ComplianceInclude, ScheduleComplianceService } from './schedule-compliance.service';
+import { UnfulfilledReportService } from './unfulfilled.service';
 
 const asInclude = (v?: string): ComplianceInclude => (v === 'pending' || v === 'complete' ? v : 'all');
 import { ReportFiltersDto } from './dto/report-filters.dto';
@@ -31,6 +32,7 @@ export class ReportsController {
   constructor(
     private reports: ReportsService,
     private compliance: ScheduleComplianceService,
+    private unfulfilled: UnfulfilledReportService,
     private prisma: PrismaService,
   ) {}
 
@@ -96,6 +98,43 @@ export class ReportsController {
   @ApiOperation({ summary: 'Registro de tutorías por alumno en Excel (.xlsx)' })
   async studentsRegistryXlsx(@Query() filters: ReportFiltersDto, @CurrentUser() user: AuthenticatedUser) {
     return new StreamableFile(await this.reports.studentRegistryXlsx(await this.scoped(filters, user)));
+  }
+
+  // ── Tutorías no realizadas o no completadas (pedido 2026-11-24) ──────
+  // Mismos roles y alcance que el resto de reportes (el animador, solo su curso).
+  // filters.kind=NOT_HELD|NOT_CLOSED|CANCELLED (opcional; sin él, las tres).
+  @Get('unfulfilled')
+  @ApiOperation({
+    summary: 'Tutorías no realizadas, no finalizadas por el docente o canceladas',
+    description: 'Filtros comunes (período, docente, materia, nivel, paralelo, from/to) y kind opcional.',
+  })
+  async unfulfilledReport(
+    @Query() filters: ReportFiltersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.unfulfilled.compute(await this.scoped(filters, user), filters.kind);
+  }
+
+  @Get('unfulfilled.xlsx')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="tutorias-no-realizadas.xlsx"')
+  @ApiOperation({ summary: 'Tutorías no realizadas o no completadas, en Excel' })
+  async unfulfilledXlsx(
+    @Query() filters: ReportFiltersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return new StreamableFile(await this.unfulfilled.xlsx(await this.scoped(filters, user), filters.kind));
+  }
+
+  @Get('unfulfilled.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'attachment; filename="tutorias-no-realizadas.pdf"')
+  @ApiOperation({ summary: 'Tutorías no realizadas o no completadas, en PDF' })
+  async unfulfilledPdf(
+    @Query() filters: ReportFiltersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return new StreamableFile(await this.unfulfilled.pdf(await this.scoped(filters, user), filters.kind));
   }
 
   // ── Cumplimiento de horarios (pedido 2026-10-13) ──────────────────────

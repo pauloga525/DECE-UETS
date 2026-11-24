@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, downloadFile } from '@/lib/api';
 import { StudentRegistryReport } from '@/components/StudentRegistryReport';
 import { ScheduleComplianceReport } from '@/components/ScheduleComplianceReport';
+import { UnfulfilledReport } from '@/components/UnfulfilledReport';
 import { useAuth } from '@/lib/auth';
 import type {
   AcademicPeriod,
@@ -49,8 +50,9 @@ export default function ReportsPage() {
     parallelId: '',
   });
   // Resumen general, Registro de tutorías por alumno (pedido 2026-10-02) y, solo para el
-  // administrador y el coordinador, Horarios de docentes (pedido 2026-10-13).
-  const [view, setView] = useState<'summary' | 'registry' | 'schedules'>('summary');
+  // administrador y el coordinador, Horarios de docentes (pedido 2026-10-13). Tutorías no
+  // realizadas o no completadas (pedido 2026-11-24).
+  const [view, setView] = useState<'summary' | 'registry' | 'unfulfilled' | 'schedules'>('summary');
   const { user } = useAuth();
   const canSeeSchedules = !!user && (user.role === 'ADMIN' || user.role === 'PSYCHOLOGY_COORDINATOR');
 
@@ -110,7 +112,7 @@ export default function ReportsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl">Reportes</h1>
-        {view !== 'schedules' && (
+        {(view === 'summary' || view === 'registry') && (
           <Button variant="secondary" onClick={handleExport}>
             Exportar CSV
           </Button>
@@ -186,6 +188,7 @@ export default function ReportsPage() {
           [
             ['summary', 'Resumen general'],
             ['registry', 'Registro de tutorías por alumno'],
+            ['unfulfilled', 'Tutorías no realizadas'],
             ...(canSeeSchedules ? ([['schedules', 'Horarios de docentes']] as const) : []),
           ] as const
         ).map(([v, label]) => (
@@ -202,6 +205,7 @@ export default function ReportsPage() {
       </div>
 
       {view === 'registry' && <StudentRegistryReport query={toQuery(filters)} />}
+      {view === 'unfulfilled' && <UnfulfilledReport query={toQuery(filters)} />}
       {view === 'schedules' && canSeeSchedules && <ScheduleComplianceReport />}
 
       {view === 'summary' && error && <ErrorState title="No se pudo generar el reporte" />}
