@@ -17,7 +17,7 @@ const KIND_LABEL: Record<Kind, string> = {
   CANCELLED: 'Cancelada',
 };
 const KIND_HELP: Record<Kind, string> = {
-  NOT_HELD: 'Estaba programada y nunca se inició; el sistema la cerró al vencer el bloque.',
+  NOT_HELD: 'Estaba programada y nunca se inició; el sistema la cerró al vencer el bloque. El docente puede registrar por qué desde el detalle de la tutoría.',
   NOT_CLOSED: 'Se inició pero el docente no la finalizó; la cerró el sistema.',
   CANCELLED: 'Cancelada, con su motivo.',
 };
@@ -40,8 +40,9 @@ interface Row {
   parallels: string[];
   students: number;
   location: string | null;
+  /** Lo que escribió el docente: motivo de no realizarla, observaciones del informe o motivo de cancelación. */
+  observation: string | null;
   reportPending: boolean;
-  cancelReason: string | null;
   cancelledBy: string | null;
 }
 interface Data {
@@ -49,7 +50,8 @@ interface Data {
   totals: Record<Kind, number>;
   total: number;
   reportsPending: number;
-  byTeacher: { teacher: string; email: string; counts: Record<Kind, number>; total: number }[];
+  notHeldWithoutReason: number;
+  byTeacher: { teacher: string; email: string; counts: Record<Kind, number>; total: number; withoutReason: number }[];
 }
 
 const fmtDate = (d: string) =>
@@ -130,8 +132,8 @@ export function UnfulfilledReport({ query }: { query: string }) {
               [
                 ['Total', data.total, 'text-ink'],
                 [KIND_LABEL.NOT_HELD, data.totals.NOT_HELD, 'text-status-danger'],
+                ['No realizadas sin observación', data.notHeldWithoutReason, 'text-status-danger'],
                 [KIND_LABEL.NOT_CLOSED, data.totals.NOT_CLOSED, 'text-status-warning'],
-                ['Informes pendientes', data.reportsPending, 'text-status-warning'],
                 [KIND_LABEL.CANCELLED, data.totals.CANCELLED, 'text-ink-soft'],
               ] as const
             ).map(([label, value, cls]) => (
@@ -163,6 +165,7 @@ export function UnfulfilledReport({ query }: { query: string }) {
                       <tr className="border-b border-line">
                         <th className="px-4 py-2 text-left">Docente</th>
                         <th className="px-4 py-2 text-center">No realizadas</th>
+                        <th className="px-4 py-2 text-center">Sin observación</th>
                         <th className="px-4 py-2 text-center">No finalizadas</th>
                         <th className="px-4 py-2 text-center">Canceladas</th>
                         <th className="px-4 py-2 text-center">Total</th>
@@ -177,6 +180,9 @@ export function UnfulfilledReport({ query }: { query: string }) {
                           </td>
                           <td className={`px-4 py-2 text-center font-mono ${t.counts.NOT_HELD ? 'text-status-danger' : ''}`}>
                             {t.counts.NOT_HELD}
+                          </td>
+                          <td className={`px-4 py-2 text-center font-mono ${t.withoutReason ? 'text-status-danger' : ''}`}>
+                            {t.withoutReason}
                           </td>
                           <td className={`px-4 py-2 text-center font-mono ${t.counts.NOT_CLOSED ? 'text-status-warning' : ''}`}>
                             {t.counts.NOT_CLOSED}
@@ -201,7 +207,7 @@ export function UnfulfilledReport({ query }: { query: string }) {
                         <th className="px-4 py-2 text-left">Docente</th>
                         <th className="px-4 py-2 text-left">Materia · Curso</th>
                         <th className="px-4 py-2 text-center">Alumnos</th>
-                        <th className="px-4 py-2 text-left">Detalle</th>
+                        <th className="px-4 py-2 text-left">Observación del docente</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
@@ -225,14 +231,19 @@ export function UnfulfilledReport({ query }: { query: string }) {
                             </span>
                           </td>
                           <td className="px-4 py-2 text-center font-mono">{r.students}</td>
-                          <td className="px-4 py-2 text-xs text-ink-soft">
-                            {r.kind === 'CANCELLED'
-                              ? `${r.cancelReason ?? 'Sin motivo'}${r.cancelledBy ? ` · ${r.cancelledBy}` : ''}`
-                              : r.kind === 'NOT_CLOSED'
-                                ? r.reportPending
-                                  ? 'Informe pendiente'
-                                  : 'Informe entregado después'
-                                : 'Nunca se inició'}
+                          <td className="max-w-xs px-4 py-2 text-xs">
+                            {r.kind === 'NOT_CLOSED' && r.reportPending ? (
+                              <span className="italic text-status-warning">Informe pendiente</span>
+                            ) : r.observation ? (
+                              <span className="whitespace-pre-line">
+                                {r.observation}
+                                {r.kind === 'CANCELLED' && r.cancelledBy && (
+                                  <span className="block text-ink-soft">{r.cancelledBy}</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="italic text-status-danger">Sin observación</span>
+                            )}
                           </td>
                         </tr>
                       ))}

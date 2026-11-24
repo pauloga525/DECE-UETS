@@ -205,6 +205,9 @@ export interface TutoringSession {
   startedAt?: string | null;
   completedAt?: string | null;
   autoCompleted?: boolean;
+  /** Tutoría programada que nunca se inició: por qué no se dio, según el docente. */
+  notHeldReason?: string | null;
+  notHeldReasonAt?: string | null;
   report?: TutoringReport | null;
   /** Instantes absolutos calculados por el servidor (solo en el detalle). */
   timing?: { startsAt: string; endsAt: string; serverNow: string };

@@ -56,6 +56,12 @@ export class CloseSessionDto {
   @IsId({ each: true })
   presentEnrollmentIds?: string[];
 
+  @ApiPropertyOptional({ type: () => AbsenceNoteInput, isArray: true, description: 'Motivo de cada ausente (opcional)' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => AbsenceNoteInput)
+  absenceNotes?: AbsenceNoteInput[];
+
   @ApiPropertyOptional({ type: () => AttendanceRecordInput, isArray: true })
   @IsOptional()
   @ValidateNested({ each: true })
@@ -68,6 +74,18 @@ export class CloseSessionDto {
   report!: TutoringReportInput;
 }
 
+/** Motivo de la inasistencia de un estudiante, escrito por el docente al tomar lista (pedido 2026-11-24). */
+export class AbsenceNoteInput {
+  @ApiProperty({ format: 'uuid' })
+  @IsId()
+  enrollmentId!: string;
+
+  @ApiProperty({ maxLength: 300 })
+  @IsString()
+  @MaxLength(300)
+  note!: string;
+}
+
 /** Iniciar la tutoría tomando lista (pedido 2026-10-02). */
 export class StartSessionDto {
   @ApiPropertyOptional({ type: [String], description: 'Inscripciones presentes al iniciar; las demás quedan ausentes' })
@@ -75,4 +93,19 @@ export class StartSessionDto {
   @IsArray()
   @IsId({ each: true })
   presentEnrollmentIds?: string[];
+
+  @ApiPropertyOptional({ type: () => AbsenceNoteInput, isArray: true, description: 'Motivo de cada ausente (opcional)' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => AbsenceNoteInput)
+  absenceNotes?: AbsenceNoteInput[];
+}
+
+/** Por qué el docente no realizó una tutoría programada (pedido 2026-11-24). */
+export class NotHeldReasonDto {
+  @ApiProperty({ minLength: 5, maxLength: 500 })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
 }

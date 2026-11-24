@@ -11,7 +11,7 @@ import { recordSessionEvent } from '../events/domain-events';
 import { AuthenticatedUser } from '../auth/authenticated-user';
 import { assertActsOnOwnTeacher } from '../teachers/teacher-of-user';
 import { AttendanceRecordInput } from './dto/record-attendance.dto';
-import { TutoringReportInput } from './dto/session-report.dto';
+import { AbsenceNoteInput, TutoringReportInput } from './dto/session-report.dto';
 
 export const ATTENDANCE_TO_ENROLLMENT_STATUS: Record<AttendanceStatus, EnrollmentStatus> = {
   [AttendanceStatus.PRESENT]: EnrollmentStatus.ATTENDED,
@@ -28,6 +28,12 @@ const ROLL_STATUSES: EnrollmentStatus[] = [
 ];
 
 type Tx = Prisma.TransactionClient;
+type RollInput = {
+  records?: AttendanceRecordInput[];
+  presentEnrollmentIds?: string[];
+  absenceNotes?: AbsenceNoteInput[];
+  report: TutoringReportInput;
+};
 
 /**
  * CU-05 ampliado (pedidos 7/9/2026): el docente toma lista mientras la tutoría está en curso
@@ -55,9 +61,15 @@ export class AttendanceService {
 
   /**
    * Convierte "estos asistieron" en registros para TODA la lista: los marcados quedan
-   * presentes y los demás ausentes (pedido 2026-10-02).
+   * presentes y los demás ausentes (pedido 2026-10-02). Cada ausente puede llevar el motivo
+   * que anotó el docente (pedido 2026-11-24); a un presente se le borra la nota anterior.
    */
-  static async rollFromPresent(tx: Tx, sessionId: string, presentIds: string[]): Promise<AttendanceRecordInput[]> {
+  static async rollFromPresent(
+    tx: Tx,
+    sessionId: string,
+    presentIds: string[],
+    absenceNotes: AbsenceNoteInput[] = [],
+  ): Promise<AttendanceRecordInput[]> {
     const roll = await tx.tutoringEnrollment.findMany({
       where: { tutoringSessionId: sessionId, status: { in: ROLL_STATUSES } },
       select: { id: true },
@@ -67,21 +79,24 @@ export class AttendanceService {
       throw new BadRequestException('Hay estudiantes en la lista que no pertenecen a esta tutoría.');
     }
     const present = new Set(presentIds);
-    return roll.map((e) => ({
-      enrollmentId: e.id,
-      status: present.has(e.id) ? AttendanceStatus.PRESENT : AttendanceStatus.ABSENT,
-    }));
+    const notes = new Map(absenceNotes.map((n) => [n.enrollmentId, n.note.trim()]));
+    return roll.map((e) =>
+      present.has(e.id)
+        ? { enrollmentId: e.id, status: AttendanceStatus.PRESENT, note: null }
+        : // Sin nota nueva se conserva la que ya tenía (p. ej. la anotada al iniciar).
+          { enrollmentId: e.id, status: AttendanceStatus.ABSENT, note: notes.get(e.id) || undefined },
+    );
   }
 
   /** Registra la lista dentro de una transacción ya abierta (lo usa el inicio de la tutoría). */
-  async recordRoll(tx: Tx, sessionId: string, presentIds: string[]) {
-    await this.upsertAttendance(tx, sessionId, await AttendanceService.rollFromPresent(tx, sessionId, presentIds));
+  async recordRoll(tx: Tx, sessionId: string, presentIds: string[], absenceNotes?: AbsenceNoteInput[]) {
+    await this.upsertAttendance(tx, sessionId, await AttendanceService.rollFromPresent(tx, sessionId, presentIds, absenceNotes));
   }
 
   /** Finalizar: IN_PROGRESS → COMPLETED. Exige lista completa e informe. */
   async completeSession(
     sessionId: string,
-    input: { records?: AttendanceRecordInput[]; presentEnrollmentIds?: string[]; report: TutoringReportInput },
+    input: RollInput,
     actor: AuthenticatedUser,
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -91,7 +106,7 @@ export class AttendanceService {
         throw new ConflictException('Solo se puede finalizar una tutoría en curso');
       }
 
-      if (input.presentEnrollmentIds) await this.recordRoll(tx, sessionId, input.presentEnrollmentIds);
+      if (input.presentEnrollmentIds) await this.recordRoll(tx, sessionId, input.presentEnrollmentIds, input.absenceNotes);
       else if (input.records?.length) await this.upsertAttendance(tx, sessionId, input.records);
       await this.assertRollComplete(tx, sessionId);
       await this.createReport(tx, sessionId, input.report, actor.userId);
@@ -121,7 +136,7 @@ export class AttendanceService {
    */
   async submitPendingReport(
     sessionId: string,
-    input: { records?: AttendanceRecordInput[]; presentEnrollmentIds?: string[]; report: TutoringReportInput },
+    input: RollInput,
     actor: AuthenticatedUser,
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -130,11 +145,16 @@ export class AttendanceService {
       if (session.status !== SessionStatus.COMPLETED) {
         throw new ConflictException('El informe se completa sobre una tutoría finalizada');
       }
+      // Una tutoría que nunca se inició no tiene informe: el docente registra por qué no se dio.
+      const { startedAt } = await tx.tutoringSession.findUniqueOrThrow({ where: { id: sessionId }, select: { startedAt: true } });
+      if (!startedAt) {
+        throw new ConflictException('Esta tutoría no se realizó: registra el motivo en lugar del informe.');
+      }
       if (await tx.tutoringReport.findUnique({ where: { tutoringSessionId: sessionId } })) {
         throw new ConflictException('Esta tutoría ya tiene su informe registrado');
       }
 
-      if (input.presentEnrollmentIds) await this.recordRoll(tx, sessionId, input.presentEnrollmentIds);
+      if (input.presentEnrollmentIds) await this.recordRoll(tx, sessionId, input.presentEnrollmentIds, input.absenceNotes);
       else if (input.records?.length) await this.upsertAttendance(tx, sessionId, input.records);
       const report = await this.createReport(tx, sessionId, input.report, actor.userId);
 
@@ -170,7 +190,7 @@ export class AttendanceService {
     for (const r of records) {
       await tx.attendance.upsert({
         where: { enrollmentId: r.enrollmentId },
-        create: { enrollmentId: r.enrollmentId, status: r.status, note: r.note },
+        create: { enrollmentId: r.enrollmentId, status: r.status, note: r.note ?? null },
         update: { status: r.status, note: r.note, recordedAt: new Date() },
       });
       await tx.tutoringEnrollment.update({

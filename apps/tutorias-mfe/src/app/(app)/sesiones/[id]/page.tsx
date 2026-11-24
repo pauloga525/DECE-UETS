@@ -32,6 +32,11 @@ export default function TutoringDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [startPresent, setStartPresent] = useState<Set<string>>(new Set());
+  // Motivo de cada ausente al tomar lista (pedido 2026-11-24).
+  const [startNotes, setStartNotes] = useState<Record<string, string>>({});
+  // Tutoría que nunca se inició: por qué no se dio (pedido 2026-11-24).
+  const [notHeldOpen, setNotHeldOpen] = useState(false);
+  const [notHeldText, setNotHeldText] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [reason, setReason] = useState<EnrollmentReason>('ACADEMIC_REINFORCEMENT');
@@ -65,6 +70,7 @@ export default function TutoringDetailPage() {
     // Este clic desbloquea el audio del navegador para la alarma del cronómetro.
     unlockAlarm();
     setStartPresent(new Set());
+    setStartNotes({});
     setStartOpen(true);
   }
 
@@ -73,7 +79,12 @@ export default function TutoringDetailPage() {
     setBusy(true);
     setActionError(null);
     try {
-      await api.post(`/tutoring/sessions/${id}/start`, { presentEnrollmentIds: [...startPresent] });
+      await api.post(`/tutoring/sessions/${id}/start`, {
+        presentEnrollmentIds: [...startPresent],
+        absenceNotes: Object.entries(startNotes)
+          .filter(([enrollmentId, note]) => !startPresent.has(enrollmentId) && note.trim())
+          .map(([enrollmentId, note]) => ({ enrollmentId, note: note.trim() })),
+      });
       router.push(`/en-curso/${id}`);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'No se pudo iniciar la tutoría');
@@ -84,6 +95,12 @@ export default function TutoringDetailPage() {
   function handleCancel() {
     runAction(() => api.post(`/tutoring/sessions/${id}/cancel`, { reason: cancelReason })).then(() =>
       setCancelOpen(false),
+    );
+  }
+
+  function saveNotHeldReason() {
+    runAction(() => api.post(`/tutoring/sessions/${id}/not-held-reason`, { reason: notHeldText.trim() })).then(() =>
+      setNotHeldOpen(false),
     );
   }
 
@@ -109,7 +126,9 @@ export default function TutoringDetailPage() {
   // El docente puede sumar estudiantes a SUS tutorías (el backend valida que sea suya).
   // Sumar estudiantes es parte de crear la tutoría: solo el DECE (pedido 2026-10-28).
   const canEnroll = canManage;
-  const reportPending = session.status === 'COMPLETED' && !session.report;
+  // Programada que nunca se inició (la cerró el sistema): no tiene informe sino un motivo.
+  const notHeld = session.status === 'COMPLETED' && !session.startedAt;
+  const reportPending = session.status === 'COMPLETED' && !session.report && !notHeld;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -166,6 +185,9 @@ export default function TutoringDetailPage() {
                       {e.student && <span className="ml-1 text-xs text-ink-soft">· {studentGroup(e.student, e.student.levelId !== session.levelId)}</span>}
                     </div>
                     <div className="text-xs text-ink-soft">{ENROLLMENT_REASON_LABEL[e.reason]}</div>
+                    {(e.status === 'ABSENT' || e.status === 'JUSTIFIED') && e.attendance?.note && (
+                      <div className="text-xs italic text-status-danger">Motivo: {e.attendance.note}</div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge tone={e.status === 'ATTENDED' ? 'accent' : e.status === 'ABSENT' ? 'danger' : 'neutral'}>
@@ -265,6 +287,37 @@ export default function TutoringDetailPage() {
         </Card>
       </div>
 
+      {notHeld && (
+        <Card className="mt-6">
+          <CardHeader className="flex items-center justify-between">
+            <span className="text-sm font-medium">¿Por qué no se realizó?</span>
+            {!session.notHeldReason && <Badge tone="danger">Sin observación</Badge>}
+          </CardHeader>
+          <CardBody>
+            <p className="mb-3 text-sm text-ink-soft">
+              La tutoría estaba programada y no se inició; el sistema la cerró al terminar su horario.
+            </p>
+            {session.notHeldReason ? (
+              <p className="whitespace-pre-line text-sm">{session.notHeldReason}</p>
+            ) : (
+              <p className="text-sm text-ink-soft">El docente aún no registra el motivo.</p>
+            )}
+            {canOperate && (
+              <Button
+                className="mt-3"
+                variant={session.notHeldReason ? 'secondary' : 'primary'}
+                onClick={() => {
+                  setNotHeldText(session.notHeldReason ?? '');
+                  setNotHeldOpen(true);
+                }}
+              >
+                {session.notHeldReason ? 'Corregir motivo' : 'Registrar motivo'}
+              </Button>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       {(session.report || reportPending) && (
         <Card className="mt-6">
           <CardHeader className="flex items-center justify-between">
@@ -302,7 +355,14 @@ export default function TutoringDetailPage() {
           Marca a los estudiantes presentes. Al iniciar se avisa por correo a cada representante si su
           representado asistió o está ausente.
         </p>
-        <AttendanceChecklist enrollments={activeEnrollments} present={startPresent} onChange={setStartPresent} disabled={busy} />
+        <AttendanceChecklist
+          enrollments={activeEnrollments}
+          present={startPresent}
+          onChange={setStartPresent}
+          disabled={busy}
+          notes={startNotes}
+          onNoteChange={(enrollmentId, note) => setStartNotes((prev) => ({ ...prev, [enrollmentId]: note }))}
+        />
         {actionError && <p className="mt-3 text-sm text-status-danger">{actionError}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setStartOpen(false)}>
@@ -310,6 +370,27 @@ export default function TutoringDetailPage() {
           </Button>
           <Button disabled={busy} onClick={handleStart}>
             {busy ? 'Iniciando…' : 'Iniciar tutoría'}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={notHeldOpen} onClose={() => setNotHeldOpen(false)} title="¿Por qué no se realizó la tutoría?">
+        <textarea
+          aria-label="Motivo"
+          rows={4}
+          maxLength={500}
+          value={notHeldText}
+          onChange={(e) => setNotHeldText(e.target.value)}
+          placeholder="Ej.: Estuve en una reunión convocada por rectorado; los estudiantes fueron avisados."
+          className="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-accent"
+        />
+        {actionError && <p className="mt-2 text-sm text-status-danger">{actionError}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setNotHeldOpen(false)}>
+            Cancelar
+          </Button>
+          <Button disabled={busy || notHeldText.trim().length < 5} onClick={saveNotHeldReason}>
+            Guardar motivo
           </Button>
         </div>
       </Modal>

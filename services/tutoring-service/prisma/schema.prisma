@@ -335,6 +335,10 @@ model TutoringSession {
   completedAt         DateTime?
   // true si la cerró el sistema al vencer su bloque de 40 min (regla R7), no el docente.
   autoCompleted       Boolean       @default(false)
+  // Tutoría programada que nunca se inició (pedido 2026-11-24): el docente explica por qué no
+  // la dio. Sale en el reporte "Tutorías no realizadas".
+  notHeldReason       String?
+  notHeldReasonAt     DateTime?
   cancelReason        String?
   cancelledById       String?
   cancelledAt         DateTime?

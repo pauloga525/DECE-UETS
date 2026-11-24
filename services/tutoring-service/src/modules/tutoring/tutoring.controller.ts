@@ -11,7 +11,7 @@ import { ScheduleSessionDto } from './dto/schedule-session.dto';
 import { AddEnrollmentsDto } from './dto/add-enrollments.dto';
 import { CancelSessionDto } from './dto/cancel-session.dto';
 import { RescheduleSessionDto } from './dto/reschedule-session.dto';
-import { CloseSessionDto, SaveAttendanceDto, StartSessionDto } from './dto/session-report.dto';
+import { CloseSessionDto, NotHeldReasonDto, SaveAttendanceDto, StartSessionDto } from './dto/session-report.dto';
 import { AddToWaitlistDto } from './dto/waitlist.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { findTeacherOfUser } from '../teachers/teacher-of-user';
@@ -112,7 +112,7 @@ export class TutoringController {
       'Solo el docente de la tutoría, dentro de su horario (desde 10 min antes), y sin otra tutoría en curso.',
   })
   start(@Param('id') id: string, @Body() dto: StartSessionDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.sessions.startSession(id, user, new Date(), dto?.presentEnrollmentIds);
+    return this.sessions.startSession(id, user, new Date(), dto?.presentEnrollmentIds, dto?.absenceNotes);
   }
 
   @Roles(...TEACHER_ROLES)
@@ -153,6 +153,14 @@ export class TutoringController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.attendance.submitPendingReport(id, dto, user);
+  }
+
+  // Tutoría programada que nunca se inició: el docente explica por qué (pedido 2026-11-24).
+  @Roles(...TEACHER_ROLES)
+  @Post(':id/not-held-reason')
+  @ApiOperation({ summary: 'Registrar por qué no se realizó una tutoría programada (Docente)' })
+  notHeldReason(@Param('id') id: string, @Body() dto: NotHeldReasonDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.sessions.setNotHeldReason(id, dto.reason, user);
   }
 
   // CU-06: cancelación no destructiva (regla 14) — motivo obligatorio.

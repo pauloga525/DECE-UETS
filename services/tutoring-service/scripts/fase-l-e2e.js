@@ -55,7 +55,7 @@ const login = async (email) =>
   check('no finalizada: informe pendiente, curso y paralelo del alumno', nc?.kind === 'NOT_CLOSED' && nc.reportPending && nc.students === 1 && nc.parallels[0] === student.parallel.name,
     JSON.stringify(nc && { kind: nc.kind, rp: nc.reportPending, par: nc.parallels }));
   const cc = d.rows.find((x) => x.id === blocks[1].id);
-  check('cancelada: motivo y quién la canceló', cc?.kind === 'CANCELLED' && cc.cancelReason === 'Docente con permiso médico' && !!cc.cancelledBy);
+  check('cancelada: motivo y quién la canceló', cc?.kind === 'CANCELLED' && cc.observation === 'Docente con permiso médico' && !!cc.cancelledBy);
   check('las no realizadas de la base aparecen como NOT_HELD', d.totals.NOT_HELD === before.totals.NOT_HELD && d.rows.filter((x) => x.kind === 'NOT_HELD').every((x) => x.reportPending === false));
   check('por docente suma lo mismo que el total', d.byTeacher.reduce((a, t) => a + t.total, 0) === d.total);
 

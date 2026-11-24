@@ -5,6 +5,7 @@ import { api, downloadFile } from '@/lib/api';
 import { StudentRegistryReport } from '@/components/StudentRegistryReport';
 import { ScheduleComplianceReport } from '@/components/ScheduleComplianceReport';
 import { UnfulfilledReport } from '@/components/UnfulfilledReport';
+import { AbsencesReport } from '@/components/AbsencesReport';
 import { useAuth } from '@/lib/auth';
 import type {
   AcademicPeriod,
@@ -52,7 +53,7 @@ export default function ReportsPage() {
   // Resumen general, Registro de tutorías por alumno (pedido 2026-10-02) y, solo para el
   // administrador y el coordinador, Horarios de docentes (pedido 2026-10-13). Tutorías no
   // realizadas o no completadas (pedido 2026-11-24).
-  const [view, setView] = useState<'summary' | 'registry' | 'unfulfilled' | 'schedules'>('summary');
+  const [view, setView] = useState<'summary' | 'registry' | 'unfulfilled' | 'absences' | 'schedules'>('summary');
   const { user } = useAuth();
   const canSeeSchedules = !!user && (user.role === 'ADMIN' || user.role === 'PSYCHOLOGY_COORDINATOR');
 
@@ -189,6 +190,7 @@ export default function ReportsPage() {
             ['summary', 'Resumen general'],
             ['registry', 'Registro de tutorías por alumno'],
             ['unfulfilled', 'Tutorías no realizadas'],
+            ['absences', 'Inasistencias de estudiantes'],
             ...(canSeeSchedules ? ([['schedules', 'Horarios de docentes']] as const) : []),
           ] as const
         ).map(([v, label]) => (
@@ -206,6 +208,7 @@ export default function ReportsPage() {
 
       {view === 'registry' && <StudentRegistryReport query={toQuery(filters)} />}
       {view === 'unfulfilled' && <UnfulfilledReport query={toQuery(filters)} />}
+      {view === 'absences' && <AbsencesReport query={toQuery(filters)} />}
       {view === 'schedules' && canSeeSchedules && <ScheduleComplianceReport />}
 
       {view === 'summary' && error && <ErrorState title="No se pudo generar el reporte" />}

@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -22,7 +23,8 @@ export class AttendanceRecordInput {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  note?: string;
+  @MaxLength(300)
+  note?: string | null;
 }
 
 export class RecordAttendanceDto {

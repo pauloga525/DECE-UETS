@@ -22,6 +22,8 @@ export default function TutoringInProgressPage() {
 
   const [session, setSession] = useState<TutoringSession | null>(null);
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
+  // Motivo de cada ausente (pedido 2026-11-24): se guarda al salir del campo y viaja al finalizar.
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -34,10 +36,16 @@ export default function TutoringInProgressPage() {
       .then((s) => {
         setSession(s);
         const initial: Record<string, AttendanceStatus> = {};
+        const initialNotes: Record<string, string> = {};
         s.enrollments?.forEach((e) => {
           if (e.attendance?.status) initial[e.id] = e.attendance.status;
+          // La nota automática del sistema no se muestra como si la hubiera escrito el docente.
+          if (e.attendance?.note && !e.attendance.note.startsWith('Registrado automáticamente')) {
+            initialNotes[e.id] = e.attendance.note;
+          }
         });
         setAttendance(initial);
+        setNotes(initialNotes);
       })
       .catch(() => setLoadError('No se pudo cargar la tutoría'));
   }, [id]);
@@ -51,7 +59,8 @@ export default function TutoringInProgressPage() {
   // Informe pendiente: el sistema ya cerró la tutoría a los 40 min. La asistencia se corrige
   // localmente y viaja junto con el informe.
   const live = session.status === 'IN_PROGRESS';
-  const pendingReport = session.status === 'COMPLETED' && !session.report;
+  // Una tutoría que nunca se inició no tiene informe: su motivo se registra en el detalle.
+  const pendingReport = session.status === 'COMPLETED' && !session.report && !!session.startedAt;
   if (!live && !pendingReport) {
     return (
       <ErrorState
@@ -86,12 +95,26 @@ export default function TutoringInProgressPage() {
     }
   }
 
+  async function saveNote(enrollmentId: string) {
+    if (!live) return;
+    try {
+      await api.post(`/tutoring/sessions/${id}/attendance`, {
+        records: [{ enrollmentId, status: 'ABSENT', note: notes[enrollmentId]?.trim() || null }],
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el motivo');
+    }
+  }
+
   async function finish(report: ReportValues) {
     setSubmitting(true);
     setError(null);
     const body = {
       // Marcados asistieron; el resto queda ausente — así viaja en el correo de cierre.
       presentEnrollmentIds: [...present],
+      absenceNotes: roll
+        .filter((e) => !present.has(e.id) && notes[e.id]?.trim())
+        .map((e) => ({ enrollmentId: e.id, note: notes[e.id].trim() })),
       report: { skills: report.skills, observations: report.observations, tasks: report.tasks || undefined },
     };
     try {
@@ -151,7 +174,15 @@ export default function TutoringInProgressPage() {
             La lista que tomaste al iniciar; corrígela si alguien llegó tarde. Al finalizar se avisa a cada
             representante si su representado asistió o estuvo ausente.
           </p>
-          <AttendanceChecklist enrollments={roll} present={present} onChange={onRollChange} disabled={submitting} />
+          <AttendanceChecklist
+            enrollments={roll}
+            present={present}
+            onChange={onRollChange}
+            disabled={submitting}
+            notes={notes}
+            onNoteChange={(enrollmentId, note) => setNotes((prev) => ({ ...prev, [enrollmentId]: note }))}
+            onNoteBlur={saveNote}
+          />
         </section>
 
         <section>

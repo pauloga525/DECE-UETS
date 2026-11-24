@@ -9,6 +9,7 @@ import { isAnimator, resolveAnimatorParallel } from '../animator/animator-scope'
 import { ReportsService } from './reports.service';
 import { ComplianceInclude, ScheduleComplianceService } from './schedule-compliance.service';
 import { UnfulfilledReportService } from './unfulfilled.service';
+import { AbsencesReportService } from './absences.service';
 
 const asInclude = (v?: string): ComplianceInclude => (v === 'pending' || v === 'complete' ? v : 'all');
 import { ReportFiltersDto } from './dto/report-filters.dto';
@@ -33,6 +34,7 @@ export class ReportsController {
     private reports: ReportsService,
     private compliance: ScheduleComplianceService,
     private unfulfilled: UnfulfilledReportService,
+    private absences: AbsencesReportService,
     private prisma: PrismaService,
   ) {}
 
@@ -135,6 +137,29 @@ export class ReportsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return new StreamableFile(await this.unfulfilled.pdf(await this.scoped(filters, user), filters.kind));
+  }
+
+  // ── Inasistencias de estudiantes (pedido 2026-11-24) ────────────────
+  @Get('absences')
+  @ApiOperation({ summary: 'Estudiantes que no asistieron: materia, docente, fecha y observación del docente' })
+  async absencesReport(@Query() filters: ReportFiltersDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.absences.compute(await this.scoped(filters, user));
+  }
+
+  @Get('absences.xlsx')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="inasistencias-estudiantes.xlsx"')
+  @ApiOperation({ summary: 'Inasistencias de estudiantes, en Excel' })
+  async absencesXlsx(@Query() filters: ReportFiltersDto, @CurrentUser() user: AuthenticatedUser) {
+    return new StreamableFile(await this.absences.xlsx(await this.scoped(filters, user)));
+  }
+
+  @Get('absences.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'attachment; filename="inasistencias-estudiantes.pdf"')
+  @ApiOperation({ summary: 'Inasistencias de estudiantes, en PDF' })
+  async absencesPdf(@Query() filters: ReportFiltersDto, @CurrentUser() user: AuthenticatedUser) {
+    return new StreamableFile(await this.absences.pdf(await this.scoped(filters, user)));
   }
 
   // ── Cumplimiento de horarios (pedido 2026-10-13) ──────────────────────

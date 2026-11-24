@@ -6,18 +6,26 @@ import { fullName, studentGroup } from '@/lib/format';
 /**
  * Lista de asistencia con casillas (pedido 2026-10-02): marcado = asistió, sin marcar =
  * ausente. Se usa al iniciar y al finalizar la tutoría; el correo a cada representante dice
- * si su representado asistió o estuvo ausente.
+ * si su representado asistió o estuvo ausente. Con `notes`, cada ausente tiene un campo
+ * opcional para anotar por qué no asistió (pedido 2026-11-24).
  */
 export function AttendanceChecklist({
   enrollments,
   present,
   onChange,
   disabled,
+  notes,
+  onNoteChange,
+  onNoteBlur,
 }: {
   enrollments: TutoringEnrollment[];
   present: Set<string>;
   onChange: (next: Set<string>) => void;
   disabled?: boolean;
+  notes?: Record<string, string>;
+  onNoteChange?: (enrollmentId: string, note: string) => void;
+  /** Al salir del campo (p. ej. para guardar la nota en el servidor). */
+  onNoteBlur?: (enrollmentId: string) => void;
 }) {
   // Si la tutoría reúne varias especialidades, cada alumno muestra la suya.
   const mixedLevels = new Set(enrollments.map((e) => e.student?.levelId)).size > 1;
@@ -72,6 +80,21 @@ export function AttendanceChecklist({
                   {checked ? 'Asistió' : 'Ausente'}
                 </span>
               </label>
+              {!checked && notes && onNoteChange && (
+                <div className="px-3 pb-2.5 pl-10">
+                  <input
+                    type="text"
+                    aria-label={`Motivo de la inasistencia de ${e.student ? fullName(e.student) : 'el estudiante'}`}
+                    placeholder="¿Por qué no asistió? (opcional)"
+                    maxLength={300}
+                    disabled={disabled}
+                    value={notes[e.id] ?? ''}
+                    onChange={(ev) => onNoteChange(e.id, ev.target.value)}
+                    onBlur={() => onNoteBlur?.(e.id)}
+                    className="w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-accent"
+                  />
+                </div>
+              )}
             </li>
           );
         })}

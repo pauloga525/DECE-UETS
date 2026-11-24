@@ -12,6 +12,7 @@ import { AttendanceService } from './attendance.service';
 import { AuthenticatedUser } from '../auth/authenticated-user';
 import { assertActsOnOwnTeacher } from '../teachers/teacher-of-user';
 import { minutesToTime, sessionInstant, START_EARLY_MINUTES, timeRangesOverlap, timeToMinutes } from '../../common/time.util';
+import { AbsenceNoteInput } from './dto/session-report.dto';
 import { ScheduleSessionDto, StudentEnrollmentInput } from './dto/schedule-session.dto';
 import {
   ACTIVE_ENROLLMENT_STATUSES,
@@ -283,6 +284,7 @@ export class TutoringSessionsService {
     actor: AuthenticatedUser,
     now = new Date(),
     presentEnrollmentIds?: string[],
+    absenceNotes?: AbsenceNoteInput[],
   ) {
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<LockedSessionRow[]>`
@@ -330,7 +332,7 @@ export class TutoringSessionsService {
         data: { status: SessionStatus.IN_PROGRESS, startedAt: now },
       });
       // Lista al iniciar (pedido 2026-10-02): presentes y ausentes viajan en el correo de inicio.
-      if (presentEnrollmentIds) await this.attendance.recordRoll(tx, sessionId, presentEnrollmentIds);
+      if (presentEnrollmentIds) await this.attendance.recordRoll(tx, sessionId, presentEnrollmentIds, absenceNotes);
       await this.audit.record(tx, {
         userId: actor.userId,
         action: 'START',
@@ -340,6 +342,35 @@ export class TutoringSessionsService {
         newValue: { status: SessionStatus.IN_PROGRESS },
       });
       await recordSessionEvent(tx, 'tutoring.started', sessionId);
+      return updated;
+    });
+  }
+
+  /**
+   * Motivo por el que no se realizó (pedido 2026-11-24): solo para una tutoría programada que
+   * nunca se inició y que el sistema cerró al vencer su bloque. Lo registra el propio docente
+   * (o un admin); se puede corregir.
+   */
+  async setNotHeldReason(sessionId: string, reason: string, actor: AuthenticatedUser) {
+    return this.prisma.$transaction(async (tx) => {
+      const session = await tx.tutoringSession.findUnique({ where: { id: sessionId } });
+      if (!session) throw new NotFoundException('Tutoría no encontrada');
+      await assertActsOnOwnTeacher(tx, actor, session.teacherId);
+      if (session.status !== SessionStatus.COMPLETED || session.startedAt) {
+        throw new ConflictException('El motivo solo se registra en una tutoría que no se realizó.');
+      }
+      const updated = await tx.tutoringSession.update({
+        where: { id: sessionId },
+        data: { notHeldReason: reason.trim(), notHeldReasonAt: new Date() },
+      });
+      await this.audit.record(tx, {
+        userId: actor.userId,
+        action: 'NOT_HELD_REASON',
+        entityType: 'TutoringSession',
+        entityId: sessionId,
+        previousValue: { notHeldReason: session.notHeldReason },
+        newValue: { notHeldReason: updated.notHeldReason },
+      });
       return updated;
     });
   }
